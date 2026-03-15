@@ -1,0 +1,209 @@
+/* Tailwind CSS v4 Modern Directives */
+@import "tailwindcss";
+@reference "tailwindcss";
+
+/* -------------------------------------------------------------------------- */
+/* Base Styles                                                                */
+/* -------------------------------------------------------------------------- */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    border-color: var(--color-black); /* v4 equivalent to border-black */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: var(--color-white);
+    color: var(--color-black);
+    line-height: 1.5;
+  }
+
+  /* Improve text rendering & Typography */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
+
+  /* Global Link & Icon Reset */
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+  
+  a:hover {
+    text-decoration: none;
+  }
+
+  /* Remove underlines and borders from icon containers */
+  a:has(svg),
+  a:has([class*="fa-"]),
+  button:has(svg),
+  button:has([class*="fa-"]),
+  svg, 
+  [class*="fa-"],
+  .icon {
+    text-decoration: none;
+    border-width: 0;
+  }
+
+  /* Global UI Interactions */
+  button {
+    background: transparent;
+    padding: 0;
+    border: none;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  /* Prevent text selection globally but allow in inputs */
+  * {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  input, 
+  textarea, 
+  select,
+  [contenteditable] {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+    font: inherit;
+  }
+
+  /* Better image handling */
+  img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Custom Utilities                                                           */
+/* -------------------------------------------------------------------------- */
+@layer utilities {
+  /* Grid Pattern Background */
+  .bg-grid-pattern {
+    background-image: 
+      linear-gradient(to right, #000 1px, transparent 1px),
+      linear-gradient(to bottom, #000 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+
+  /* --- Hard Border & Background Utility Classes --- */
+  .border-hard { border: 2px solid #000; }
+  .border-hard-thin { border: 1px solid #000; }
+  .border-hard-thick { border: 4px solid #000; }
+
+  .bg-hard-white {
+    background-color: #fff;
+    border: 2px solid #000;
+  }
+  
+  .bg-hard-black {
+    background-color: #000;
+    border: 2px solid #000;
+    color: #fff;
+  }
+
+  /* --- Text Effects --- */
+  .text-outline {
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+  }
+  
+  .text-outline-white {
+    text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+  }
+
+  /* --- Animation Classes --- */
+  .animate-slideDown { animation: slideDown 0.3s ease-out forwards; }
+  .animate-slideUp { animation: slideUp 0.3s ease-out forwards; }
+  .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+  .animate-fadeInItem { animation: fadeInItem 0.3s ease-out forwards; }
+  .animate-scaleIn { animation: scaleIn 0.3s ease-out forwards; }
+  .animate-spin { animation: spin 1s linear infinite; }
+  .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+  /* --- Keyframes --- */
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  @keyframes dots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
+  }
+
+  /* Loading Dots */
+  .loading-dots::after {
+    content: '...';
+    animation: dots 1.5s steps(4, end) infinite;
+  }
+
+  /* --- Scrollbar --- */
+  ::-webkit-scrollbar { width: 12px; height: 12px; }
+  ::-webkit-scrollbar-track {
+    background-color: #fff;
+    border-left: 2px solid #000;
+    border-top: 2px solid #000;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: #000;
+    border: 2px solid #fff;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Global Overrides & Specifics                                               */
+/* -------------------------------------------------------------------------- */
+
+/* Selection Style */
+::selection {
+  background-color: #000;
+  color: #fff;
+}
+
+/* Focus Styles */
+*:focus-visible {
+  outline: none;
+  ring: 2px solid #000;
+  outline-offset: 2px;
+}
+
+/* Remove number input spinners */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] { -moz-appearance: textfield; }
+
+/* Print Logic */
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+}
