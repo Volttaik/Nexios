@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faArrowUp,
   faCopy,
   faThumbsUp,
   faThumbsDown,
@@ -30,6 +29,11 @@ interface Message {
   imageUrls?: string[];
 }
 
+// Define proper types for Gemini API
+interface GeminiResponse {
+  text?: string;
+}
+
 export default function ChatPage() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string>('');
@@ -43,7 +47,7 @@ export default function ChatPage() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [user, setUser] = useState<AppUser | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [ai, setAi] = useState<any>(null);
+  const [ai, setAi] = useState<GoogleGenAI | null>(null);
 
   const currentSession = sessions.find(s => s.id === currentSessionId);
   const messages = currentSession?.messages || [];
@@ -86,15 +90,15 @@ export default function ChatPage() {
     if (savedSessions) {
       try {
         const parsed = JSON.parse(savedSessions);
-        const sessionsWithDates = parsed.map((s: any) => ({
+        const sessionsWithDates = parsed.map((s: Record<string, unknown>) => ({
           ...s,
-          createdAt: new Date(s.createdAt),
-          updatedAt: new Date(s.updatedAt),
-          messages: s.messages.map((m: any) => ({
+          createdAt: new Date(s.createdAt as string),
+          updatedAt: new Date(s.updatedAt as string),
+          messages: (s.messages as any[]).map((m: Record<string, unknown>) => ({
             ...m,
-            timestamp: new Date(m.timestamp)
+            timestamp: new Date(m.timestamp as string)
           }))
-        }));
+        })) as ChatSession[];
         setSessions(sessionsWithDates);
         if (sessionsWithDates.length > 0 && !currentSessionId) {
           setCurrentSessionId(sessionsWithDates[0].id);
@@ -104,6 +108,13 @@ export default function ChatPage() {
       }
     }
   }, [currentSessionId]);
+
+  // Save sessions to localStorage
+  useEffect(() => {
+    if (sessions.length > 0) {
+      localStorage.setItem('chatSessions', JSON.stringify(sessions));
+    }
+  }, [sessions]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -118,7 +129,7 @@ export default function ChatPage() {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = (e) => {
-        const img = new Image();
+        const img = new window.Image();
         img.src = e.target?.result as string;
         
         img.onload = () => {
@@ -187,6 +198,9 @@ export default function ChatPage() {
     } finally {
       setIsUploading(false);
     }
+    
+    // Clear the input value so the same file can be selected again
+    e.target.value = '';
   };
 
   const removeImage = (index: number) => {
@@ -241,6 +255,8 @@ export default function ChatPage() {
       const remainingSessions = sessions.filter(s => s.id !== chatId);
       if (remainingSessions.length > 0) {
         setCurrentSessionId(remainingSessions[0].id);
+      } else {
+        setCurrentSessionId('');
       }
     }
   };
@@ -257,13 +273,13 @@ export default function ChatPage() {
     ));
   };
 
-  const callGeminiAPI = async (prompt: string, imageUrls?: string[]) => {
+  const callGeminiAPI = async (prompt: string, imageUrls?: string[]): Promise<string> => {
     if (!ai) {
       return "AI service is not initialized. Please check your API key.";
     }
 
     try {
-      const contents = [];
+      const contents: any[] = [];
       
       if (prompt.trim()) {
         contents.push({ text: prompt });
@@ -297,7 +313,7 @@ export default function ChatPage() {
       const response = await ai.models.generateContent({
         model: "gemini-2.0-flash-exp",
         contents: contents,
-      });
+      }) as GeminiResponse;
       
       if (response && response.text) {
         return response.text;
@@ -305,9 +321,9 @@ export default function ChatPage() {
         return "I received an empty response. Please try again.";
       }
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('Gemini API error:', error);
-      return `I'm sorry, I encountered an error: ${error.message || 'Unknown error'}`;
+      return `I'm sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   };
 
@@ -511,13 +527,20 @@ export default function ChatPage() {
                           <button 
                             onClick={() => copyToClipboard(message.text)}
                             className="text-gray-300 hover:text-gray-600 transition-colors p-0.5"
+                            aria-label="Copy to clipboard"
                           >
                             <FontAwesomeIcon icon={faCopy} className="w-2.5 h-2.5" />
                           </button>
-                          <button className="text-gray-300 hover:text-gray-600 transition-colors p-0.5">
+                          <button 
+                            className="text-gray-300 hover:text-gray-600 transition-colors p-0.5"
+                            aria-label="Thumbs up"
+                          >
                             <FontAwesomeIcon icon={faThumbsUp} className="w-2.5 h-2.5" />
                           </button>
-                          <button className="text-gray-300 hover:text-gray-600 transition-colors p-0.5">
+                          <button 
+                            className="text-gray-300 hover:text-gray-600 transition-colors p-0.5"
+                            aria-label="Thumbs down"
+                          >
                             <FontAwesomeIcon icon={faThumbsDown} className="w-2.5 h-2.5" />
                           </button>
                         </div>
@@ -562,6 +585,7 @@ export default function ChatPage() {
                     <button
                       onClick={() => removeImage(idx)}
                       className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-label="Remove image"
                     >
                       <FontAwesomeIcon icon={faXmark} className="w-2.5 h-2.5 text-white" />
                     </button>
@@ -585,6 +609,7 @@ export default function ChatPage() {
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
+                aria-label="Upload image"
               >
                 <FontAwesomeIcon icon={faImage} className="w-3 h-3" />
               </button>
@@ -621,6 +646,7 @@ export default function ChatPage() {
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-gray-900 text-white hover:bg-gray-800'
                 }`}
+                aria-label="Send message"
               >
                 <FontAwesomeIcon icon={faPaperPlane} className="w-3 h-3" />
               </button>
