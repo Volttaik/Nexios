@@ -34,6 +34,14 @@ interface GeminiResponse {
   text?: string;
 }
 
+interface ParsedSession {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function ChatPage() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string>('');
@@ -89,14 +97,14 @@ export default function ChatPage() {
     const savedSessions = localStorage.getItem('chatSessions');
     if (savedSessions) {
       try {
-        const parsed = JSON.parse(savedSessions);
-        const sessionsWithDates = parsed.map((s: Record<string, unknown>) => ({
+        const parsed = JSON.parse(savedSessions) as ParsedSession[];
+        const sessionsWithDates = parsed.map((s: ParsedSession) => ({
           ...s,
-          createdAt: new Date(s.createdAt as string),
-          updatedAt: new Date(s.updatedAt as string),
-          messages: (s.messages as any[]).map((m: Record<string, unknown>) => ({
+          createdAt: new Date(s.createdAt),
+          updatedAt: new Date(s.updatedAt),
+          messages: s.messages.map((m: Message) => ({
             ...m,
-            timestamp: new Date(m.timestamp as string)
+            timestamp: new Date(m.timestamp)
           }))
         })) as ChatSession[];
         setSessions(sessionsWithDates);
@@ -124,7 +132,7 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  const compressImage = (file: File, maxWidth = 1024): Promise<File> => {
+  const compressImage = async (file: File, maxWidth = 1024): Promise<File> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -279,7 +287,7 @@ export default function ChatPage() {
     }
 
     try {
-      const contents: any[] = [];
+      const contents: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
       
       if (prompt.trim()) {
         contents.push({ text: prompt });
@@ -352,7 +360,8 @@ export default function ChatPage() {
         : session
     ));
 
-    if (messages.filter(m => m.sender === 'user').length === 0) {
+    const userMessagesCount = messages.filter(m => m.sender === 'user').length;
+    if (userMessagesCount === 0) {
       updateSessionTitle(currentSessionId, input || 'Image message');
     }
 
@@ -401,7 +410,7 @@ export default function ChatPage() {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -450,7 +459,7 @@ export default function ChatPage() {
           className="flex-1 overflow-y-auto px-3 py-3 scrollbar-hide"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
-          <style jsx>{`
+          <style>{`
             div::-webkit-scrollbar {
               display: none;
             }
