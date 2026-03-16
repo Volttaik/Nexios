@@ -57,7 +57,8 @@ export default function RegisterPage() {
       if (!response.ok) throw new Error(data.error || 'Registration failed');
 
       localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      const normalizedUser = { ...data.user, _id: data.user._id || data.user.id };
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
       setShowSuccessModal(true);
       setIsLoading(false);
       setTimeout(() => { setShowSuccessModal(false); router.push('/login'); }, 3000);

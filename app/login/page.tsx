@@ -48,7 +48,8 @@ function LoginForm() {
       if (!response.ok) throw new Error(data.error || 'Login failed');
 
       localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      const normalizedUser = { ...data.user, _id: data.user._id || data.user.id };
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
       document.cookie = `auth_token=${data.token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
 
       setShowSuccess(true);

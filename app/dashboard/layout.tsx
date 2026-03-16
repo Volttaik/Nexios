@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import DashboardSidebar from './components/DashboardSidebar';
 import DashboardHeader from './components/DashboardHeader';
 import type { AppUser } from '@/app/types/user';
@@ -15,18 +16,23 @@ export default function DashboardLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [currentChatId, setCurrentChatId] = useState<string>();
+  const pathname = usePathname();
 
-  // Load user data
+  const isChatPage = pathname === '/dashboard/chat';
+
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (userData) {
       setUser(JSON.parse(userData));
     }
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = '/login';
+    }
   }, []);
 
   const handleNewChat = (newSession: ChatSession) => {
     setCurrentChatId(newSession.id);
-    // You might want to navigate to the chat page here
     window.location.href = '/dashboard/chat';
   };
 
@@ -35,6 +41,10 @@ export default function DashboardLayout({
     localStorage.removeItem('token');
     window.location.href = '/login';
   };
+
+  if (isChatPage) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -50,10 +60,8 @@ export default function DashboardLayout({
         onMobileClose={() => setIsMobileOpen(false)}
         onMobileOpen={() => setIsMobileOpen(true)}
       />
-      
-      <div className={`transition-all duration-300 ${
-        isSidebarOpen ? 'md:ml-72' : 'md:ml-20'
-      }`}>
+
+      <div className={`transition-all duration-300 ${isSidebarOpen ? 'md:ml-72' : 'md:ml-16'}`}>
         <DashboardHeader
           toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           isSidebarOpen={isSidebarOpen}
@@ -61,7 +69,6 @@ export default function DashboardLayout({
           onLogout={handleLogout}
           onMobileMenuOpen={() => setIsMobileOpen(true)}
         />
-        
         <main className="p-6">
           {children}
         </main>

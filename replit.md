@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a Next.js 15 web application — Nexios AI — an enterprise-grade AI platform with user authentication, a dashboard, and AI chat features. It uses MongoDB for data storage, JWT for authentication, and Tailwind CSS v4 for styling.
+Nexios AI is a Next.js 15 enterprise AI platform with MongoDB/JWT authentication, a Gemini-powered chat interface, and a full dashboard. Built with glass-morphism UI, dark sidebar, model selection, and profile picture support.
 
 ## User Preferences
 
@@ -16,7 +16,8 @@ Preferred communication style: Simple, everyday language.
 - **Styling**: Tailwind CSS v4
 - **Database**: MongoDB (via Mongoose)
 - **Auth**: JWT tokens (jsonwebtoken + jose), bcryptjs for password hashing
-- **Icons**: React Icons (hi/bs) + Font Awesome (via @fortawesome)
+- **AI**: Google Gemini API (`@google/genai`) — models: `gemini-2.0-flash`, `gemini-1.5-flash`, `gemini-1.5-pro`
+- **Icons**: React Icons (hi/bs) + inline SVGs (sidebar/chat use pure SVG)
 - **Language**: TypeScript
 
 ### Project Structure
@@ -24,37 +25,46 @@ Preferred communication style: Simple, everyday language.
 ```
 app/
   api/
-    login/route.ts       — POST /api/login
-    register/route.ts    — POST /api/register
+    login/route.ts         — POST /api/login
+    register/route.ts      — POST /api/register
+    upload/route.ts        — POST /api/upload (image uploads)
   components/
-    Header.tsx           — Top navigation bar (public pages)
-    MenuDropdown.tsx     — Navigation dropdown menu
-    SubdomainHandler.tsx — Subdomain detection & redirect
-    LoadingSpinner.tsx   — Reusable loading spinner
-    ShareableLink.tsx    — Copy shareable auth link
+    Header.tsx             — Top navigation bar (public pages)
+    MenuDropdown.tsx       — Navigation dropdown menu
   dashboard/
-    layout.tsx           — Protected dashboard layout (auth check)
-    page.tsx             — Dashboard overview
-    chat/page.tsx        — AI chat page
+    layout.tsx             — Protected dashboard layout (auth check + sidebar offset)
+    page.tsx               — Dashboard overview
+    chat/page.tsx          — AI chat (full-screen, fixed overlay, bypasses layout sidebar)
+    analytics/page.tsx     — Usage analytics (sessions, messages, tokens, model usage)
+    documents/page.tsx     — Chat history as documents (searchable, filterable)
+    settings/page.tsx      — Settings (model, profile pic, preferences, danger zone)
+    profile/page.tsx       — User profile (account details + usage stats)
     components/
-      DashboardHeader.tsx   — Dashboard top bar
-      DashboardSidebar.tsx  — Left navigation sidebar
-      UserDropdown.tsx      — User profile dropdown
+      DashboardHeader.tsx  — Dashboard top bar (header for non-chat pages)
+      DashboardSidebar.tsx — Dark charcoal sidebar; exports AI_MODELS and ChatSession type
+      UserDropdown.tsx     — User profile dropdown
   lib/
-    mongodb.ts           — Mongoose connection helper (cached)
-    tokenUtils.ts        — JWT verify + URL token utilities
+    mongodb.ts             — Mongoose connection helper (cached)
+    tokenUtils.ts          — JWT verify + URL token utilities
   models/
-    user.ts              — Mongoose User schema
-  login/page.tsx         — Login page
-  register/page.tsx      — Register page
-  page.tsx               — Landing/home page
-  layout.tsx             — Root layout
-  globals.css            — Global styles + Tailwind
-components/
-  UserDropdown.tsx       — Shared user dropdown (uses Next.js router)
-public/
-  images/logo.jpg        — App logo
+    user.ts                — Mongoose User schema
+  types/
+    user.ts                — AppUser interface (_id, id, fullName, username, email, etc.)
+  login/page.tsx           — Login page (normalizes id → _id on save)
+  register/page.tsx        — Register page (normalizes id → _id on save)
+  page.tsx                 — Landing/home page (auto-redirects logged-in users to /dashboard/chat)
+  layout.tsx               — Root layout
+  globals.css              — Global styles + Tailwind
 ```
+
+### Key Design Decisions
+
+- **Chat page** uses `fixed inset-0 z-50` to cover the full screen (bypasses dashboard layout)
+- **Sidebar** is dark charcoal `#111113` with glass-morphism dropdowns
+- **AI_MODELS** is exported from `DashboardSidebar.tsx` and shared by chat + settings pages
+- **Profile picture** stored as base64 in `localStorage.profilePicture`; also inside `localStorage.user.profilePicture`
+- **Selected model** persisted in `localStorage.selectedModel`
+- **Chat sessions** persisted in `localStorage.chatSessions`
 
 ### Environment Variables
 
@@ -62,13 +72,26 @@ public/
 |----------|-------------|----------|
 | `MONGODB_URI` | MongoDB connection string | Yes (for auth API) |
 | `JWT_SECRET` | Secret for signing JWT tokens | Yes (auto-generated) |
+| `NEXT_PUBLIC_GEMINI_API_KEY` | Gemini API key for AI chat | Yes (for AI features) |
 
 ### Authentication Flow
 
-1. User registers at `/register` → POST `/api/register` → stores hashed password in MongoDB → returns JWT
-2. User logs in at `/login` → POST `/api/login` → verifies password → returns JWT
-3. JWT stored in `localStorage` and as a cookie
-4. Dashboard layout checks `localStorage` for token; redirects to `/login` if absent
+1. User registers at `/register` → POST `/api/register` → stores hashed password in MongoDB → returns JWT + user (with `id`)
+2. User logs in at `/login` → POST `/api/login` → verifies password → returns JWT + user
+3. Frontend normalizes `user.id` → `user._id` before storing in localStorage
+4. JWT stored in `localStorage.token` and as a cookie `auth_token`
+5. Dashboard layout checks `localStorage` for token; redirects to `/login` if absent
+
+### Gemini API Usage
+
+```ts
+const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
+const response = await ai.models.generateContent({
+  model: 'gemini-2.0-flash',  // or gemini-1.5-flash / gemini-1.5-pro
+  contents: [{ role: 'user', parts: [{ text: prompt }, ...imageInlineData] }],
+});
+const text = response.text;
+```
 
 ### Running the App
 
@@ -76,7 +99,8 @@ public/
 - **Prod server**: `npm run start` (runs on port 5000, bound to 0.0.0.0)
 - **Workflow**: "Start application" — configured to auto-start with `npm run dev`
 
-### Known Setup Notes
+### Known Notes
 
-- The app's UI works without MongoDB; auth endpoints will fail gracefully with a clear error if `MONGODB_URI` is not set
+- The app's UI works without MongoDB; auth endpoints fail gracefully with a clear error if `MONGODB_URI` is not set
 - `JWT_SECRET` is auto-generated and stored as an env var on first setup
+- Gemini chat requires `NEXT_PUBLIC_GEMINI_API_KEY` — without it, AI responses show a configuration message
