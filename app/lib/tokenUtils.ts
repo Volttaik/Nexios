@@ -1,7 +1,7 @@
-import { jwtVerify, SignJWT } from 'jose';
+import { jwtVerify } from 'jose';
 
 const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-this'
+  process.env.JWT_SECRET || '7f8d9a3b2c1e5f6a8b7c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6'
 );
 
 export interface TokenPayload {
@@ -19,14 +19,9 @@ export async function verifyToken(token: string): Promise<TokenPayload | null> {
       username: payload.username as string,
     };
   } catch (error) {
+    console.error('Token verification failed:', error);
     return null;
   }
-}
-
-export function createAuthUrl(baseUrl: string, token: string): string {
-  const url = new URL(baseUrl, window.location.origin);
-  url.searchParams.set('token', token);
-  return url.toString();
 }
 
 export function getTokenFromUrl(): string | null {
@@ -43,4 +38,10 @@ export function removeTokenFromUrl(): void {
     url.searchParams.delete('token');
     window.history.replaceState({}, '', url.toString());
   }
+}
+
+export function createAuthUrl(path: string, token: string): string {
+  const url = new URL(path, window.location.origin);
+  url.searchParams.set('token', token);
+  return url.toString();
 }
