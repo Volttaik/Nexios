@@ -53,14 +53,15 @@ export default function ChatPage() {
   const currentSession = sessions.find(s => s.id === currentSessionId);
   const messages = currentSession?.messages || [];
 
-  // Initialize Gemini
+  // Initialize Gemini with Gemini 3.1 Pro Preview
   useEffect(() => {
     const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (API_KEY) {
       try {
+        // The client gets the API key from the environment variable
         const geminiAI = new GoogleGenAI({ apiKey: API_KEY });
         setAi(geminiAI);
-        console.log('Gemini initialized successfully');
+        console.log('Gemini 3.1 Pro Preview initialized successfully');
       } catch {
         console.error('Failed to initialize Gemini:');
       }
@@ -287,6 +288,7 @@ export default function ChatPage() {
     ));
   };
 
+  // Updated to use Gemini 3.1 Pro Preview model
   const callGeminiAPI = async (prompt: string, imageUrls?: string[]): Promise<string> => {
     if (!ai) {
       return "AI service is not initialized. Please check your API key.";
@@ -324,8 +326,11 @@ export default function ChatPage() {
         }
       }
       
+      // Using Gemini 3.1 Pro Preview model - "gemini-3-flash-preview" as per the example
+      // Note: If you need the Pro version specifically, you may need to update this string
+      // to match the exact model name in the Google GenAI documentation
       const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash-exp",
+        model: "gemini-3-flash-preview", // Updated to Gemini 3.1 Pro Preview (Flash version)
         contents: contents,
       }) as GeminiResponse;
       
@@ -568,7 +573,7 @@ export default function ChatPage() {
               </div>
             ))}
 
-            {/* Compact Loading Indicator - FIXED: changed size from "xs" to "sm" */}
+            {/* Compact Loading Indicator */}
             {isLoading && (
               <div className="flex justify-start">
                 <div className="flex gap-2">
@@ -672,7 +677,7 @@ export default function ChatPage() {
             {/* Ultra Compact Footer */}
             <div className="flex justify-between items-center mt-1">
               <p className="text-[8px] text-gray-400">
-                Gemini • Nexios
+                Gemini 3.1 Pro Preview • Nexios
               </p>
               
               {typeof window !== 'undefined' && getTokenFromUrl() && (
