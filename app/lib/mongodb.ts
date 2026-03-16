@@ -1,12 +1,5 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI;
-
-if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable');
-}
-
-// Cache the mongoose connection
 let cached = global.mongoose;
 
 if (!cached) {
@@ -14,6 +7,12 @@ if (!cached) {
 }
 
 async function connectDB() {
+  const MONGODB_URI = process.env.MONGODB_URI;
+
+  if (!MONGODB_URI) {
+    throw new Error('Please define the MONGODB_URI environment variable');
+  }
+
   if (cached.conn) {
     return cached.conn;
   }
@@ -30,10 +29,10 @@ async function connectDB() {
 
   try {
     cached.conn = await cached.promise;
-    console.log('✅ Connected to MongoDB');
+    console.log('Connected to MongoDB');
   } catch (e) {
     cached.promise = null;
-    console.error('❌ MongoDB connection error:', e);
+    console.error('MongoDB connection error:', e);
     throw e;
   }
 

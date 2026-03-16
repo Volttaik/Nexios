@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faArrowUp,
-  faUser,
   faCopy,
   faThumbsUp,
   faThumbsDown,
@@ -87,7 +86,7 @@ export default function ChatPage() {
   }, [messages]);
 
   const callGeminiAPI = async (prompt: string) => {
-    const API_KEY = 'AIzaSyCxp5V1dR669hRps2n2PC2HQrrvbMMf_-I';
+    const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
     const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`;
 
     try {
@@ -196,7 +195,7 @@ export default function ChatPage() {
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto space-y-4 py-4 max-w-5xl mx-auto w-full">
-        {messages.map((message, index) => (
+        {messages.map((message) => (
           <div
             key={message.id}
             className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}

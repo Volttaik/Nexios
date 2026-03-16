@@ -10,12 +10,7 @@ interface SubdomainHandlerProps {
 export default function SubdomainHandler({ children }: SubdomainHandlerProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [subdomain, setSubdomain] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
-
   useEffect(() => {
-    setMounted(true);
-    
     // Get hostname from window
     const hostname = window.location.hostname;
     const parts = hostname.split('.');
@@ -26,17 +21,11 @@ export default function SubdomainHandler({ children }: SubdomainHandlerProps) {
       // Handle cases like app.localhost or app.example.com
       detectedSubdomain = parts[0];
     }
-    
-    setSubdomain(detectedSubdomain);
-    
     // If we're on a subdomain and not already on a dashboard path, redirect
     if (detectedSubdomain && !pathname.startsWith('/dashboard')) {
       router.push(`/dashboard${pathname === '/' ? '' : pathname}`);
     }
   }, [pathname, router]);
-
-  // Pass subdomain to children via context or props
-  if (!mounted) return null;
 
   return (
     <>

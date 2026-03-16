@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { 
   HiBell, 
   HiSearch,
@@ -10,8 +9,8 @@ import {
   HiOutlineMenuAlt2,
   HiGlobe
 } from 'react-icons/hi';
-import { BsGrid, BsRobot } from 'react-icons/bs';
-import DashboardSidebar from './DashboardSidebar';
+import { BsGrid } from 'react-icons/bs';
+import UserDropdown from './UserDropdown';
 
 interface DashboardHeaderProps {
   toggleSidebar: () => void;
@@ -31,7 +30,6 @@ export default function DashboardHeader({
   subdomain
 }: DashboardHeaderProps) {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   const notifications = [
@@ -80,8 +78,6 @@ export default function DashboardHeader({
           <input
             type="text"
             placeholder="Search..."
-            onFocus={() => setIsSearchFocused(true)}
-            onBlur={() => setIsSearchFocused(false)}
             className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
           />
         </div>
@@ -147,8 +143,8 @@ export default function DashboardHeader({
           )}
         </div>
 
-        {/* Dashboard Sidebar Dropdown */}
-        <DashboardSidebar user={user} />
+        {/* User Dropdown */}
+        <UserDropdown user={user} onLogout={onLogout} />
       </div>
     </header>
   );

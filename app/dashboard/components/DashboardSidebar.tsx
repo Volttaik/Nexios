@@ -1,154 +1,121 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { 
-  HiBell, 
-  HiSearch,
-  HiSun,
-  HiMoon,
-  HiOutlineMenuAlt2
-} from 'react-icons/hi';
-import { BsGrid } from 'react-icons/bs';
-import DashboardSidebar from './DashboardSidebar';
+import { usePathname } from 'next/navigation';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faGauge,
+  faRobot,
+  faChartLine,
+  faFileAlt,
+  faCog,
+} from '@fortawesome/free-solid-svg-icons';
 
-interface DashboardHeaderProps {
-  toggleSidebar: () => void;
-  isSidebarOpen: boolean;
-  user: any;
-  onLogout: () => void;
-  onMobileMenuOpen: () => void;
+interface DashboardSidebarProps {
+  isOpen: boolean;
+  user: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  onClose?: () => void;
+  isMobileOpen: boolean;
+  onMobileClose: () => void;
 }
 
-export default function DashboardHeader({ 
-  toggleSidebar, 
-  isSidebarOpen, 
-  user, 
-  onLogout,
-  onMobileMenuOpen 
-}: DashboardHeaderProps) {
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+const navItems = [
+  { href: '/dashboard', label: 'Overview', icon: faGauge },
+  { href: '/dashboard/chat', label: 'AI Chat', icon: faRobot },
+  { href: '/dashboard/analytics', label: 'Analytics', icon: faChartLine },
+  { href: '/dashboard/documents', label: 'Documents', icon: faFileAlt },
+  { href: '/dashboard/settings', label: 'Settings', icon: faCog },
+];
 
-  const notifications = [
-    { id: 1, text: 'AI model training completed', time: '2 min ago', read: false },
-    { id: 2, text: 'Weekly report ready', time: '1 hour ago', read: false },
-    { id: 3, text: 'New feature available', time: '3 hours ago', read: true },
-  ];
+export default function DashboardSidebar({
+  isOpen,
+  user,
+  isMobileOpen,
+  onMobileClose,
+}: DashboardSidebarProps) {
+  const pathname = usePathname();
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-6 sticky top-0 z-30">
-      {/* Left section */}
-      <div className="flex items-center gap-4">
-        <button 
-          onClick={onMobileMenuOpen}
-          className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-          aria-label="Open mobile menu"
-        >
-          <HiOutlineMenuAlt2 className="w-5 h-5 text-gray-700" />
-        </button>
-        
-        <button 
-          onClick={toggleSidebar}
-          className="hidden md:flex p-2 rounded-lg hover:bg-gray-100 transition-colors"
-          aria-label="Toggle sidebar"
-        >
-          <HiOutlineMenuAlt2 className={`w-5 h-5 text-gray-700 transition-transform duration-300 ${
-            isSidebarOpen ? '' : 'rotate-180'
-          }`} />
-        </button>
+    <>
+      {/* Mobile overlay */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-30 md:hidden"
+          onClick={onMobileClose}
+        />
+      )}
 
-        {/* Breadcrumb */}
-        <div className="hidden md:flex items-center gap-2 text-sm">
-          <Link href="/dashboard" className="text-gray-400 hover:text-gray-900 transition-colors">
-            Dashboard
-          </Link>
-          <span className="text-gray-300">/</span>
-          <span className="text-gray-900 font-medium">Overview</span>
-        </div>
-      </div>
-
-      {/* Center - Search Bar */}
-      <div className="hidden md:block flex-1 max-w-md mx-4">
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <HiSearch className="h-4 w-4 text-gray-400" />
+      {/* Sidebar */}
+      <aside
+        className={`fixed top-0 left-0 h-full bg-white border-r border-gray-200 z-40 flex flex-col transition-all duration-300
+          ${isOpen ? 'w-64' : 'w-20'}
+          ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}
+      >
+        {/* Logo */}
+        <div className="h-16 flex items-center px-4 border-b border-gray-200 gap-3 shrink-0">
+          <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0">
+            <Image
+              src="/images/logo.jpg"
+              alt="Nexios AI"
+              width={32}
+              height={32}
+              className="object-cover"
+              priority
+            />
           </div>
-          <input
-            type="text"
-            placeholder="Search..."
-            onFocus={() => setIsSearchFocused(true)}
-            onBlur={() => setIsSearchFocused(false)}
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
-          />
-        </div>
-      </div>
-
-      {/* Right section */}
-      <div className="flex items-center gap-2">
-        {/* Theme Toggle */}
-        <button
-          onClick={() => setIsDarkMode(!isDarkMode)}
-          className="hidden md:flex p-2 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          {isDarkMode ? (
-            <HiSun className="w-5 h-5 text-gray-700" />
-          ) : (
-            <HiMoon className="w-5 h-5 text-gray-700" />
+          {isOpen && (
+            <span className="text-sm font-bold text-gray-900 truncate">
+              Nexios AI
+            </span>
           )}
-        </button>
+        </div>
 
-        {/* Apps Launcher */}
-        <button className="hidden md:flex p-2 rounded-lg hover:bg-gray-100 transition-colors">
-          <BsGrid className="w-5 h-5 text-gray-700" />
-        </button>
+        {/* Nav Items */}
+        <nav className="flex-1 py-4 space-y-1 px-2 overflow-y-auto">
+          {navItems.map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onMobileClose}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm font-medium
+                  ${active
+                    ? 'bg-black text-white'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }
+                `}
+              >
+                <FontAwesomeIcon icon={item.icon} className="w-4 h-4 shrink-0" />
+                {isOpen && <span className="truncate">{item.label}</span>}
+              </Link>
+            );
+          })}
+        </nav>
 
-        {/* Notifications */}
-        <div className="relative">
-          <button
-            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
-          >
-            <HiBell className="w-5 h-5 text-gray-700" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
-          </button>
-
-          {/* Notifications Dropdown */}
-          {isNotificationsOpen && (
-            <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-xl z-50">
-              <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-                <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
-                  3 new
+        {/* User Footer */}
+        {user && (
+          <div className="border-t border-gray-200 p-3 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center shrink-0">
+                <span className="text-white text-xs font-bold">
+                  {user.fullName?.[0]?.toUpperCase() || 'U'}
                 </span>
               </div>
-              <div className="max-h-96 overflow-y-auto">
-                {notifications.map((notif) => (
-                  <div
-                    key={notif.id}
-                    className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${
-                      !notif.read ? 'bg-gray-50/50' : ''
-                    }`}
-                  >
-                    <p className="text-sm text-gray-900 mb-1">{notif.text}</p>
-                    <p className="text-xs text-gray-400">{notif.time}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="p-3 border-t border-gray-100">
-                <button className="w-full text-center text-xs text-gray-500 hover:text-gray-900 transition-colors">
-                  View all notifications
-                </button>
-              </div>
+              {isOpen && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-900 truncate">
+                    {user.fullName}
+                  </p>
+                  <p className="text-[10px] text-gray-500 truncate">{user.email}</p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-
-        {/* Dashboard Sidebar Dropdown - Moved here */}
-        <DashboardSidebar user={user} />
-      </div>
-    </header>
+          </div>
+        )}
+      </aside>
+    </>
   );
 }
