@@ -64,6 +64,14 @@ export default function DashboardPage() {
     { id: 3, title: 'Data Analysis', date: '2 days ago', preview: 'Analyzing customer behavior patterns and trends...' },
   ];
 
+  // Create a dynamic greeting based on user
+  const getGreeting = () => {
+    if (user?.fullName) {
+      return `Welcome back, ${user.fullName}! 👋`;
+    }
+    return 'Welcome back, User! 👋';
+  };
+
   return (
     <div className={`min-h-screen transition-colors duration-300 ${
       darkMode ? 'dark bg-gray-900' : 'bg-white'
@@ -74,13 +82,13 @@ export default function DashboardPage() {
           <h1 className={`text-2xl font-bold ${
             darkMode ? 'text-white' : 'text-gray-900'
           }`}>
-            Welcome back, {user?.fullName || 'User'}! 👋
+            {getGreeting()}
           </h1>
           <p className={`text-sm ${
             darkMode ? 'text-gray-400' : 'text-gray-500'
           }`}>
             {subdomain && <span className="mr-2">📍 {subdomain}.nexios.ai</span>}
-            Here's what's happening with your account today.
+            Here&apos;s what&apos;s happening with your account today.
           </p>
         </div>
         
