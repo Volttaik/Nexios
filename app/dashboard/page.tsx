@@ -15,7 +15,7 @@ import {
   faMessage
 } from '@fortawesome/free-solid-svg-icons';
 import type { AppUser } from '@/app/types/user';
-import type { ChatSession } from '../components/DashboardSidebar';
+import type { ChatSession } from './components/DashboardSidebar';
 
 export default function DashboardPage() {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -45,8 +45,8 @@ export default function DashboardPage() {
     const savedSessions = localStorage.getItem('chatSessions');
     if (savedSessions) {
       try {
-        const parsed = JSON.parse(savedSessions);
-        const sessionsWithDates = parsed.map((s: any) => ({
+        const parsed: any[] = JSON.parse(savedSessions);
+        const sessionsWithDates: ChatSession[] = parsed.map((s: any) => ({
           ...s,
           createdAt: new Date(s.createdAt),
           updatedAt: new Date(s.updatedAt),
@@ -67,11 +67,11 @@ export default function DashboardPage() {
         const avgTime = calculateAvgResponseTime(sessionsWithDates);
         
         // Get unique models used (you'd need to track this in your messages)
-        const models = new Set();
-        sessionsWithDates.forEach(session => {
-          session.messages.forEach(msg => {
-            if (msg.sender === 'ai' && (msg as any).model) {
-              models.add((msg as any).model);
+        const models = new Set<string>();
+        sessionsWithDates.forEach((session: ChatSession) => {
+          session.messages.forEach((msg: any) => {
+            if (msg.sender === 'ai' && msg.model) {
+              models.add(msg.model as string);
             }
           });
         });
@@ -147,8 +147,8 @@ export default function DashboardPage() {
 
   const getTotalTokens = () => {
     // Estimate tokens based on message length
-    const totalChars = sessions.reduce((acc, session) => 
-      acc + session.messages.reduce((msgAcc, msg) => 
+    const totalChars = sessions.reduce((acc: number, session: ChatSession) => 
+      acc + session.messages.reduce((msgAcc: number, msg: { text: string }) => 
         msgAcc + msg.text.length, 0
       ), 0
     );

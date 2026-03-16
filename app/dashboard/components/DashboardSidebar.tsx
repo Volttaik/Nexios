@@ -526,7 +526,7 @@ export default function DashboardSidebar({
                     <FontAwesomeIcon icon={faIdCard} className="w-4 h-4 text-gray-400" />
                     <span className="flex-1">User ID</span>
                     <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
-                      {user.id || 'N/A'}
+                      {user._id || 'N/A'}
                     </span>
                   </div>
                   
