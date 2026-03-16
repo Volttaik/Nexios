@@ -5,7 +5,7 @@ import {
   faChevronLeft,
   faChevronRight,
   faUser,
-  faLogout,
+  faArrowRightFromBracket,
   faBell
 } from '@fortawesome/free-solid-svg-icons';
 import type { AppUser } from '@/app/types/user';
@@ -82,7 +82,7 @@ export default function DashboardHeader({
                 onClick={onLogout}
                 className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-50 flex items-center gap-2"
               >
-                <FontAwesomeIcon icon={faLogout} className="w-4 h-4" />
+                <FontAwesomeIcon icon={faArrowRightFromBracket} className="w-4 h-4" />
                 Logout
               </button>
             </div>
