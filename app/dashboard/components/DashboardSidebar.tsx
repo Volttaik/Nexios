@@ -83,7 +83,7 @@ export default function DashboardSidebar({
   onToggle,
   isMobileOpen,
   onMobileClose,
-  onMobileOpen
+  onMobileOpen: _onMobileOpen // Prefix with underscore to indicate intentionally unused
 }: DashboardSidebarProps) {
   const pathname = usePathname();
   const isChatPage = pathname === '/dashboard/chat';
@@ -95,7 +95,8 @@ export default function DashboardSidebar({
   const [showUserMenu, setShowUserMenu] = useState(false);
   
   const editInputRef = useRef<HTMLInputElement>(null);
-  const longPressTimer = useRef<NodeJS.Timeout>();
+  // Fix: Add initial value to useRef
+  const longPressTimer = useRef<NodeJS.Timeout | undefined>(undefined);
   const pressedChatId = useRef<string | null>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -116,8 +117,9 @@ export default function DashboardSidebar({
           sessionKey: s.sessionKey || generateSessionKey()
         }));
         setSessions(sessionsWithDates);
-      } catch (error) {
-        console.error('Failed to load sessions:', error);
+      } catch {
+        // Remove unused error variable
+        console.error('Failed to load sessions:');
       }
     }
   }, []);
@@ -195,12 +197,16 @@ export default function DashboardSidebar({
   };
 
   const handleMouseUp = () => {
-    clearTimeout(longPressTimer.current);
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+    }
     pressedChatId.current = null;
   };
 
   const handleMouseLeave = () => {
-    clearTimeout(longPressTimer.current);
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+    }
     pressedChatId.current = null;
   };
 
