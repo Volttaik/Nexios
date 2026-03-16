@@ -46,7 +46,6 @@ export default function ChatPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [user, setUser] = useState<AppUser | null>(null);
   const [mounted, setMounted] = useState(false);
   const [ai, setAi] = useState<GoogleGenAI | null>(null);
@@ -62,8 +61,8 @@ export default function ChatPage() {
         const geminiAI = new GoogleGenAI({ apiKey: API_KEY });
         setAi(geminiAI);
         console.log('Gemini initialized successfully');
-      } catch (error) {
-        console.error('Failed to initialize Gemini:', error);
+      } catch (_error) {
+        console.error('Failed to initialize Gemini:');
       }
     } else {
       console.error('Gemini API key is missing');
@@ -105,8 +104,8 @@ export default function ChatPage() {
         if (sessionsWithDates.length > 0 && !currentSessionId) {
           setCurrentSessionId(sessionsWithDates[0].id);
         }
-      } catch (error) {
-        console.error('Failed to load sessions:', error);
+      } catch (_error) {
+        console.error('Failed to load sessions:');
       }
     }
   }, [currentSessionId]);
@@ -195,8 +194,8 @@ export default function ChatPage() {
       }
       
       setSelectedFiles(prev => [...prev, ...newFiles]);
-    } catch (error) {
-      console.error('Failed to process images:', error);
+    } catch (_error) {
+      console.error('Failed to process images:');
     } finally {
       setIsUploading(false);
     }
@@ -231,8 +230,8 @@ export default function ChatPage() {
 
         const data = await response.json();
         uploaded.push(data.url);
-      } catch (error) {
-        console.error('Failed to upload image:', error);
+      } catch (_error) {
+        console.error('Failed to upload image:');
       }
     }
 
@@ -319,8 +318,8 @@ export default function ChatPage() {
                 data: base64Data
               }
             });
-          } catch (error) {
-            console.error('Failed to process image for Gemini:', error);
+          } catch (_error) {
+            console.error('Failed to process image for Gemini:');
           }
         }
       }
@@ -336,9 +335,8 @@ export default function ChatPage() {
         return "I received an empty response. Please try again.";
       }
       
-    } catch (error) {
-      console.error('Gemini API error:', error);
-      return `I'm sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    } catch (_error) {
+      return `I'm sorry, I encountered an error. Please try again.`;
     }
   };
 
@@ -397,9 +395,7 @@ export default function ChatPage() {
             }
           : session
       ));
-    } catch (error) {
-      console.error('Error in handleSend:', error);
-      
+    } catch (_error) {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: "I'm sorry, an unexpected error occurred. Please try again.",
@@ -468,7 +464,6 @@ export default function ChatPage() {
 
         {/* Messages Area - Edge to edge, compact */}
         <div 
-          ref={messagesContainerRef}
           className="flex-1 overflow-y-auto px-3 py-3 scrollbar-hide"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >

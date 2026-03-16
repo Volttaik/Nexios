@@ -12,10 +12,7 @@ import {
   faSun,
   faMoon,
   faComments,
-  faClock,
-  faMessage,
-  faTrash,
-  faPen
+  faMessage
 } from '@fortawesome/free-solid-svg-icons';
 import type { AppUser } from '@/app/types/user';
 import type { ChatSession } from '../components/DashboardSidebar';

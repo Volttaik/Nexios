@@ -1,10 +1,8 @@
-// app/api/upload/route.ts
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get('image') as File;
@@ -24,36 +22,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert to buffer
+    // Convert file to buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
     // Create unique filename
-    const ext = path.extname(file.name) || '.jpg';
-    const filename = `${uuidv4()}${ext}`;
+    const timestamp = Date.now();
+    const filename = `${timestamp}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
     
-    // Create uploads directory if it doesn't exist
+    // Define upload path
     const uploadDir = path.join(process.cwd(), 'public/uploads');
+    const filePath = path.join(uploadDir, filename);
+    
+    // Ensure upload directory exists
     try {
       await mkdir(uploadDir, { recursive: true });
-    } catch (error) {
-      // Directory might already exist
+    } catch (_err) {
+      // Directory already exists or can't be created - continue
     }
 
     // Save file
-    const filepath = path.join(uploadDir, filename);
-    await writeFile(filepath, buffer);
-
-    // Return the URL path
+    await writeFile(filePath, buffer);
+    
+    // Return public URL
+    const url = `/uploads/${filename}`;
+    
     return NextResponse.json({ 
-      url: `/uploads/${filename}`,
+      success: true, 
+      url,
       filename 
     });
-
-  } catch (error) {
-    console.error('Upload error:', error);
+    
+  } catch (_error) {  // Prefix with underscore to mark as intentionally unused
+    console.error('Upload failed:');
     return NextResponse.json(
-      { error: 'Failed to upload image' },
+      { error: 'Upload failed' },
       { status: 500 }
     );
   }

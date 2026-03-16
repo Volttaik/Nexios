@@ -20,7 +20,6 @@ import {
   faCopy,
   faCheck,
   faEllipsisVertical,
-  faUser,
   faEnvelope,
   faCalendar,
   faIdCard,
