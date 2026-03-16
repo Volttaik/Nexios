@@ -11,10 +11,11 @@ import {
   faFileAlt,
   faCog,
 } from '@fortawesome/free-solid-svg-icons';
+import type { AppUser } from '@/app/types/user';
 
 interface DashboardSidebarProps {
   isOpen: boolean;
-  user: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  user: AppUser | null;
   onClose?: () => void;
   isMobileOpen: boolean;
   onMobileClose: () => void;

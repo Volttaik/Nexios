@@ -19,6 +19,7 @@ import ShareableLink from '@/app/components/ShareableLink';
 import LoadingSpinner from '@/app/components/LoadingSpinner';
 import { useSubdomain } from '@/app/components/SubdomainHandler';
 import { getTokenFromUrl } from '@/app/lib/tokenUtils';
+import type { AppUser } from '@/app/types/user';
 
 interface Message {
   id: string;
@@ -39,7 +40,7 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [showAttachments, setShowAttachments] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [darkMode, setDarkMode] = useState(false);

@@ -13,9 +13,10 @@ import {
   faMoon
 } from '@fortawesome/free-solid-svg-icons';
 import { useSubdomain } from '@/app/components/SubdomainHandler';
+import type { AppUser } from '@/app/types/user';
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [darkMode, setDarkMode] = useState(false);
   const [mounted, setMounted] = useState(false);
   const subdomain = useSubdomain();

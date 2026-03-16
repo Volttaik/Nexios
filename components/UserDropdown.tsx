@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import type { AppUser } from '@/app/types/user';
 
 interface UserDropdownProps {
-  user?: any;
+  user?: AppUser | null;
 }
 
 const UserDropdown: React.FC<UserDropdownProps> = ({ user }) => {

@@ -4,9 +4,10 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRightFromBracket, faCog } from '@fortawesome/free-solid-svg-icons';
+import type { AppUser } from '@/app/types/user';
 
 interface UserDropdownProps {
-  user: any;
+  user: AppUser | null;
   onLogout: () => void;
 }
 

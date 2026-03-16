@@ -11,11 +11,12 @@ import {
 } from 'react-icons/hi';
 import { BsGrid } from 'react-icons/bs';
 import UserDropdown from './UserDropdown';
+import type { AppUser } from '@/app/types/user';
 
 interface DashboardHeaderProps {
   toggleSidebar: () => void;
   isSidebarOpen: boolean;
-  user: any;
+  user: AppUser | null;
   onLogout: () => void;
   onMobileMenuOpen: () => void;
   subdomain: string | null;

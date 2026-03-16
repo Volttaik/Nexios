@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardHeader from './components/DashboardHeader';
 import DashboardSidebar from './components/DashboardSidebar';
-import { useSubdomain } from '@/app/components/SubdomainHandler'; // 👈 Uses it here
+import { useSubdomain } from '@/app/components/SubdomainHandler';
+import type { AppUser } from '@/app/types/user';
 
 export default function DashboardLayout({
   children,
@@ -14,7 +15,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const subdomain = useSubdomain(); // 👈 Hook is used here
 
   useEffect(() => {
