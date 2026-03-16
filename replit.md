@@ -72,8 +72,9 @@ public/
 
 ### Running the App
 
-- **Dev server**: `npm run dev` (runs on port 5000)
-- **Workflow**: "Start application" — configured to auto-start
+- **Dev server**: `npm run dev` (runs on port 5000, bound to 0.0.0.0 for Replit compatibility)
+- **Prod server**: `npm run start` (runs on port 5000, bound to 0.0.0.0)
+- **Workflow**: "Start application" — configured to auto-start with `npm run dev`
 
 ### Known Setup Notes
 
