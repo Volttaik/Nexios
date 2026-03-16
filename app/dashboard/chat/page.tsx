@@ -1,60 +1,75 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { GoogleGenAI } from '@google/genai';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faArrowUp,
   faCopy,
   faThumbsUp,
   faThumbsDown,
-  faPlus,
   faRobot,
-  faPaperclip,
-  faFaceSmile,
-  faSun,
-  faMoon,
-  faCheck
+  faImage,
+  faXmark,
+  faCheck,
+  faSpinner,
+  faPaperPlane
 } from '@fortawesome/free-solid-svg-icons';
 import ShareableLink from '@/app/components/ShareableLink';
 import LoadingSpinner from '@/app/components/LoadingSpinner';
 import { getTokenFromUrl } from '@/app/lib/tokenUtils';
 import type { AppUser } from '@/app/types/user';
+import Image from 'next/image';
+import DashboardSidebar, { ChatSession } from '../components/DashboardSidebar';
 
 interface Message {
   id: string;
   text: string;
   sender: 'user' | 'ai';
   timestamp: Date;
+  imageUrls?: string[];
 }
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: "Hello! I'm your Nexios AI assistant powered by Google Gemini. How can I help you today?",
-      sender: 'ai',
-      timestamp: new Date(),
-    },
-  ]);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string>('');
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [user, setUser] = useState<AppUser | null>(null);
-  const [showAttachments, setShowAttachments] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [ai, setAi] = useState<any>(null);
+
+  const currentSession = sessions.find(s => s.id === currentSessionId);
+  const messages = currentSession?.messages || [];
+
+  // Initialize Gemini
+  useEffect(() => {
+    const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    if (API_KEY) {
+      try {
+        const geminiAI = new GoogleGenAI({ apiKey: API_KEY });
+        setAi(geminiAI);
+        console.log('Gemini initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize Gemini:', error);
+      }
+    } else {
+      console.error('Gemini API key is missing');
+    }
+  }, []);
 
   // Handle hydration
   useEffect(() => {
     setMounted(true);
-    // Check for saved dark mode preference
-    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
-    setDarkMode(savedDarkMode);
-    
-    // Check for token in URL
     const urlToken = getTokenFromUrl();
     if (urlToken) {
-      console.log('Token found in URL:', urlToken.substring(0, 20) + '...');
+      console.log('Token found in URL');
     }
   }, []);
 
@@ -65,16 +80,30 @@ export default function ChatPage() {
     }
   }, []);
 
-  // Apply dark mode class to html element
+  // Load sessions from localStorage
   useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('darkMode', 'true');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('darkMode', 'false');
+    const savedSessions = localStorage.getItem('chatSessions');
+    if (savedSessions) {
+      try {
+        const parsed = JSON.parse(savedSessions);
+        const sessionsWithDates = parsed.map((s: any) => ({
+          ...s,
+          createdAt: new Date(s.createdAt),
+          updatedAt: new Date(s.updatedAt),
+          messages: s.messages.map((m: any) => ({
+            ...m,
+            timestamp: new Date(m.timestamp)
+          }))
+        }));
+        setSessions(sessionsWithDates);
+        if (sessionsWithDates.length > 0 && !currentSessionId) {
+          setCurrentSessionId(sessionsWithDates[0].id);
+        }
+      } catch (error) {
+        console.error('Failed to load sessions:', error);
+      }
     }
-  }, [darkMode]);
+  }, [currentSessionId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -84,65 +113,276 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  const callGeminiAPI = async (prompt: string) => {
-    const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`;
+  const compressImage = (file: File, maxWidth = 1024): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target?.result as string;
+        
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              reject(new Error('Failed to compress image'));
+            }
+          }, 'image/jpeg', 0.8);
+        };
+        
+        img.onerror = reject;
+      };
+      reader.onerror = reject;
+    });
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    setIsUploading(true);
+    const newFiles: File[] = [];
+    const newPreviews: string[] = [];
 
     try {
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }]
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (data.error) {
-        console.error('Gemini API error:', data.error);
-        return "I'm sorry, I encountered an error. Please try again.";
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        const compressedFile = await compressImage(file);
+        newFiles.push(compressedFile);
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          newPreviews.push(e.target?.result as string);
+          if (newPreviews.length === files.length) {
+            setImagePreviews(prev => [...prev, ...newPreviews]);
+          }
+        };
+        reader.readAsDataURL(compressedFile);
       }
-
-      return data.candidates[0].content.parts[0].text;
+      
+      setSelectedFiles(prev => [...prev, ...newFiles]);
     } catch (error) {
-      console.error('Error calling Gemini API:', error);
-      return "I'm sorry, I'm having trouble connecting right now. Please try again.";
+      console.error('Failed to process images:', error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadImages = async (): Promise<string[]> => {
+    if (selectedFiles.length === 0) return [];
+
+    const uploaded: string[] = [];
+    
+    for (const file of selectedFiles) {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      try {
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error('Upload failed');
+        }
+
+        const data = await response.json();
+        uploaded.push(data.url);
+      } catch (error) {
+        console.error('Failed to upload image:', error);
+      }
+    }
+
+    return uploaded;
+  };
+
+  const handleNewChat = (newSession: ChatSession) => {
+    setSessions(prev => [newSession, ...prev]);
+    setCurrentSessionId(newSession.id);
+    setInput('');
+    setSelectedFiles([]);
+    setImagePreviews([]);
+  };
+
+  const handleChatSelect = (chatId: string) => {
+    setCurrentSessionId(chatId);
+  };
+
+  const handleDeleteChat = (chatId: string) => {
+    setSessions(prev => prev.filter(s => s.id !== chatId));
+    if (currentSessionId === chatId) {
+      const remainingSessions = sessions.filter(s => s.id !== chatId);
+      if (remainingSessions.length > 0) {
+        setCurrentSessionId(remainingSessions[0].id);
+      }
+    }
+  };
+
+  const updateSessionTitle = (sessionId: string, firstMessage: string) => {
+    setSessions(prev => prev.map(session => 
+      session.id === sessionId
+        ? { 
+            ...session, 
+            title: firstMessage.slice(0, 30) + (firstMessage.length > 30 ? '...' : ''),
+            updatedAt: new Date()
+          }
+        : session
+    ));
+  };
+
+  const callGeminiAPI = async (prompt: string, imageUrls?: string[]) => {
+    if (!ai) {
+      return "AI service is not initialized. Please check your API key.";
+    }
+
+    try {
+      const contents = [];
+      
+      if (prompt.trim()) {
+        contents.push({ text: prompt });
+      }
+      
+      if (imageUrls && imageUrls.length > 0) {
+        for (const url of imageUrls) {
+          try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const base64 = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.readAsDataURL(blob);
+            });
+            
+            const base64Data = (base64 as string).split(',')[1];
+            
+            contents.push({
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: base64Data
+              }
+            });
+          } catch (error) {
+            console.error('Failed to process image for Gemini:', error);
+          }
+        }
+      }
+      
+      const response = await ai.models.generateContent({
+        model: "gemini-2.0-flash-exp",
+        contents: contents,
+      });
+      
+      if (response && response.text) {
+        return response.text;
+      } else {
+        return "I received an empty response. Please try again.";
+      }
+      
+    } catch (error: any) {
+      console.error('Gemini API error:', error);
+      return `I'm sorry, I encountered an error: ${error.message || 'Unknown error'}`;
     }
   };
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && selectedFiles.length === 0) || isLoading || isUploading || !currentSession) return;
 
+    setIsLoading(true);
+    
+    const uploadedUrls = await uploadImages();
+    
     const userMessage: Message = {
       id: Date.now().toString(),
       text: input,
       sender: 'user',
       timestamp: new Date(),
+      imageUrls: uploadedUrls,
     };
 
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
+    setSessions(prev => prev.map(session => 
+      session.id === currentSessionId
+        ? { 
+            ...session, 
+            messages: [...session.messages, userMessage],
+            updatedAt: new Date()
+          }
+        : session
+    ));
 
-    // Get response from Gemini
-    const geminiResponse = await callGeminiAPI(input);
+    if (messages.filter(m => m.sender === 'user').length === 0) {
+      updateSessionTitle(currentSessionId, input || 'Image message');
+    }
 
-    const aiMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      text: geminiResponse,
-      sender: 'ai',
-      timestamp: new Date(),
-    };
+    const currentInput = input;
+    const currentImages = [...uploadedUrls];
     
-    setMessages(prev => [...prev, aiMessage]);
-    setIsLoading(false);
+    setInput('');
+    setSelectedFiles([]);
+    setImagePreviews([]);
+
+    try {
+      const geminiResponse = await callGeminiAPI(currentInput, currentImages);
+
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: geminiResponse,
+        sender: 'ai',
+        timestamp: new Date(),
+      };
+      
+      setSessions(prev => prev.map(session => 
+        session.id === currentSessionId
+          ? { 
+              ...session, 
+              messages: [...session.messages, aiMessage],
+              updatedAt: new Date()
+            }
+          : session
+      ));
+    } catch (error) {
+      console.error('Error in handleSend:', error);
+      
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: "I'm sorry, an unexpected error occurred. Please try again.",
+        sender: 'ai',
+        timestamp: new Date(),
+      };
+      setSessions(prev => prev.map(session => 
+        session.id === currentSessionId
+          ? { ...session, messages: [...session.messages, errorMessage] }
+          : session
+      ));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -161,245 +401,247 @@ export default function ChatPage() {
     return `${formattedHours}:${formattedMinutes} ${ampm}`;
   };
 
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
   };
 
-  // Don't render until after mount
   if (!mounted) {
     return null;
   }
 
   return (
-    <div className={`flex flex-col h-screen w-full px-4 md:px-12 lg:px-24 py-6 transition-colors duration-300 ${
-      darkMode ? 'dark bg-gray-900' : 'bg-white'
-    }`}>
-      {/* Header with Dark Mode Toggle and Share Button */}
-      <div className="flex justify-end items-center gap-2 mb-4">
-        {/* Shareable Link Button */}
-        <ShareableLink path="/dashboard/chat" label="Share Chat" />
-        
-        {/* Dark Mode Toggle */}
-        <button
-          onClick={toggleDarkMode}
-          className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
-            darkMode 
-              ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' 
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
+    <div className="flex h-screen w-full bg-white">
+      <DashboardSidebar 
+        user={user}
+        currentChatId={currentSessionId}
+        onChatSelect={handleChatSelect}
+        onNewChat={handleNewChat}
+        onDeleteChat={handleDeleteChat}
+      />
+
+      {/* Main Chat Area - Edge to edge */}
+      <div className="flex-1 flex flex-col h-full">
+        {/* Ultra Compact Header */}
+        <div className="flex-shrink-0 border-b border-gray-200 bg-white h-12 flex items-center px-3">
+          <div className="flex justify-end items-center w-full">
+            <ShareableLink path="/dashboard/chat" label="Share" />
+          </div>
+        </div>
+
+        {/* Messages Area - Edge to edge, compact */}
+        <div 
+          ref={messagesContainerRef}
+          className="flex-1 overflow-y-auto px-3 py-3 scrollbar-hide"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
-          <FontAwesomeIcon icon={darkMode ? faSun : faMoon} className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto space-y-4 py-4 max-w-5xl mx-auto w-full">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`flex gap-3 max-w-3xl ${
-                message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'
-              }`}
-            >
-              {/* Avatar */}
+          <style jsx>{`
+            div::-webkit-scrollbar {
+              display: none;
+            }
+          `}</style>
+          
+          <div className="space-y-3">
+            {messages.map((message) => (
               <div
-                className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  message.sender === 'user' 
-                    ? darkMode ? 'bg-gray-700' : 'bg-gray-100'
-                    : darkMode ? 'bg-blue-600' : 'bg-gray-900'
-                }`}
+                key={message.id}
+                className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                {message.sender === 'user' ? (
-                  <span className={`text-xs font-medium ${
-                    darkMode ? 'text-gray-300' : 'text-gray-600'
-                  }`}>
-                    {user?.fullName?.charAt(0) || 'U'}
-                  </span>
-                ) : (
-                  <FontAwesomeIcon icon={faRobot} className={`w-3 h-3 ${
-                    darkMode ? 'text-white' : 'text-white'
-                  }`} />
-                )}
-              </div>
+                <div
+                  className={`flex gap-2 max-w-[85%] ${
+                    message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'
+                  }`}
+                >
+                  {/* Ultra Compact Avatar */}
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      message.sender === 'user' 
+                        ? 'bg-gray-100'
+                        : 'bg-gray-900'
+                    }`}
+                  >
+                    {message.sender === 'user' ? (
+                      <span className="text-[10px] font-medium text-gray-600">
+                        {user?.fullName?.charAt(0) || 'U'}
+                      </span>
+                    ) : (
+                      <FontAwesomeIcon icon={faRobot} className="w-3 h-3 text-white" />
+                    )}
+                  </div>
 
-              {/* Message Content */}
-              <div className="flex-1">
-                <div className={`${message.sender === 'user' ? 'text-right' : ''}`}>
-                  <p className={`text-xs leading-relaxed whitespace-pre-wrap ${
-                    darkMode 
-                      ? message.sender === 'user' ? 'text-gray-200' : 'text-gray-300'
-                      : 'text-gray-800'
-                  }`}>
-                    {message.text}
-                  </p>
-                </div>
-                
-                {/* Message Footer */}
-                <div className={`flex items-center gap-2 mt-0.5 ${
-                  message.sender === 'user' ? 'justify-end' : 'justify-start'
-                }`}>
-                  <span className={`text-[10px] ${
-                    darkMode ? 'text-gray-500' : 'text-gray-400'
-                  }`}>
-                    {formatTime(message.timestamp)}
-                  </span>
-                  
-                  {message.sender === 'ai' && (
-                    <div className="flex items-center gap-1.5">
-                      <button className={`transition-colors ${
-                        darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600'
-                      }`}>
-                        <FontAwesomeIcon icon={faCopy} className="w-2.5 h-2.5" />
-                      </button>
-                      <button className={`transition-colors ${
-                        darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600'
-                      }`}>
-                        <FontAwesomeIcon icon={faThumbsUp} className="w-2.5 h-2.5" />
-                      </button>
-                      <button className={`transition-colors ${
-                        darkMode ? 'text-gray-500 hover:text-gray-400' : 'text-gray-400 hover:text-gray-600'
-                      }`}>
-                        <FontAwesomeIcon icon={faThumbsDown} className="w-2.5 h-2.5" />
-                      </button>
+                  {/* Message Content - Compact */}
+                  <div className="flex-1">
+                    <div className={`${message.sender === 'user' ? 'text-right' : ''}`}>
+                      {/* Tiny Image Previews */}
+                      {message.imageUrls && message.imageUrls.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-1 justify-end">
+                          {message.imageUrls.map((url, idx) => (
+                            <div key={idx} className="relative w-16 h-16 rounded-md overflow-hidden border border-gray-200">
+                              <Image
+                                src={url}
+                                alt="Uploaded"
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {message.text && (
+                        <p className={`text-xs leading-relaxed whitespace-pre-wrap rounded-xl px-3 py-2 inline-block max-w-full ${
+                          message.sender === 'user'
+                            ? 'bg-gray-900 text-white'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {message.text}
+                        </p>
+                      )}
                     </div>
-                  )}
+                    
+                    {/* Ultra Compact Message Footer */}
+                    <div className={`flex items-center gap-1 mt-0.5 ${
+                      message.sender === 'user' ? 'justify-end' : 'justify-start'
+                    }`}>
+                      <span className="text-[9px] text-gray-400">
+                        {formatTime(message.timestamp)}
+                      </span>
+                      
+                      {message.sender === 'ai' && (
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={() => copyToClipboard(message.text)}
+                            className="text-gray-300 hover:text-gray-600 transition-colors p-0.5"
+                          >
+                            <FontAwesomeIcon icon={faCopy} className="w-2.5 h-2.5" />
+                          </button>
+                          <button className="text-gray-300 hover:text-gray-600 transition-colors p-0.5">
+                            <FontAwesomeIcon icon={faThumbsUp} className="w-2.5 h-2.5" />
+                          </button>
+                          <button className="text-gray-300 hover:text-gray-600 transition-colors p-0.5">
+                            <FontAwesomeIcon icon={faThumbsDown} className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        ))}
+            ))}
 
-        {/* Loading Indicator */}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="flex gap-3">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                darkMode ? 'bg-blue-600' : 'bg-gray-900'
-              }`}>
-                <FontAwesomeIcon icon={faRobot} className="w-3 h-3 text-white" />
-              </div>
-              <div className={`rounded-2xl p-3 ${
-                darkMode ? 'bg-gray-800' : 'bg-gray-50'
-              }`}>
-                <LoadingSpinner size="sm" color={darkMode ? 'white' : 'black'} />
-              </div>
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input Area */}
-      <div className="max-w-5xl mx-auto w-full py-4">
-        <div className="flex items-center gap-1.5">
-          {/* Message Input */}
-          <div className="flex-1 relative">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyPress}
-              placeholder="Type your message..."
-              className={`w-full px-4 py-3 text-sm rounded-full focus:ring-1 focus:ring-gray-300 outline-none resize-none transition ${
-                darkMode 
-                  ? 'bg-gray-800 text-gray-200 placeholder-gray-500 border-0' 
-                  : 'bg-gray-50 text-gray-900 placeholder-gray-400 border-0'
-              }`}
-              rows={1}
-              style={{ minHeight: '42px', maxHeight: '120px' }}
-            />
-          </div>
-
-          {/* Attachments Toggle */}
-          <div className="relative">
-            <button
-              onClick={() => setShowAttachments(!showAttachments)}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                darkMode 
-                  ? 'bg-gray-800 text-gray-400 hover:bg-gray-700' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
-            </button>
-
-            {/* Attachments Menu */}
-            {showAttachments && (
-              <div className={`absolute bottom-10 right-0 rounded-xl shadow-lg border p-1 min-w-36 z-50 ${
-                darkMode 
-                  ? 'bg-gray-800 border-gray-700' 
-                  : 'bg-white border-gray-100'
-              }`}>
-                <button className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg transition-colors ${
-                  darkMode 
-                    ? 'text-gray-300 hover:bg-gray-700' 
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}>
-                  <FontAwesomeIcon icon={faPaperclip} className="w-3 h-3" />
-                  <span>Attach file</span>
-                </button>
-                <button className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg transition-colors ${
-                  darkMode 
-                    ? 'text-gray-300 hover:bg-gray-700' 
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}>
-                  <FontAwesomeIcon icon={faFaceSmile} className="w-3 h-3" />
-                  <span>Add emoji</span>
-                </button>
+            {/* Compact Loading Indicator */}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="flex gap-2">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center bg-gray-900">
+                    <FontAwesomeIcon icon={faRobot} className="w-3 h-3 text-white" />
+                  </div>
+                  <div className="rounded-xl p-2 bg-gray-100">
+                    <LoadingSpinner size="xs" color="black" />
+                  </div>
+                </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
-
-          {/* Send Button */}
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || isLoading}
-            className={`w-8 h-8 rounded-full transition-all flex items-center justify-center ${
-              !input.trim() || isLoading 
-                ? darkMode 
-                  ? 'bg-gray-800 text-gray-600 cursor-not-allowed' 
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : darkMode
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-gray-900 text-white hover:bg-gray-800'
-            }`}
-          >
-            <FontAwesomeIcon icon={faArrowUp} className="w-3 h-3" />
-          </button>
         </div>
 
-        {/* Footer Note */}
-        <div className="flex justify-between items-center mt-3">
-          <p className={`text-[10px] ${
-            darkMode ? 'text-gray-500' : 'text-gray-400'
-          }`}>
-            Powered by Google Gemini • Nexios AI
-          </p>
-          
-          {/* Token Status Indicator */}
-          {typeof window !== 'undefined' && getTokenFromUrl() && (
-            <div className={`flex items-center gap-1 px-2 py-1 rounded-full ${
-              darkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600'
-            }`}>
-              <FontAwesomeIcon icon={faCheck} className="w-2 h-2" />
-              <span className="text-[8px] font-medium">Token Auth</span>
+        {/* Ultra Compact Input Area */}
+        <div className="flex-shrink-0 border-t border-gray-200 bg-white">
+          <div className="px-3 py-2">
+            {/* Tiny Image Previews */}
+            {imagePreviews.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-2">
+                {imagePreviews.map((preview, idx) => (
+                  <div key={idx} className="relative w-12 h-12 rounded-md overflow-hidden border border-gray-200 group">
+                    <Image
+                      src={preview}
+                      alt="Preview"
+                      fill
+                      className="object-cover"
+                    />
+                    <button
+                      onClick={() => removeImage(idx)}
+                      className="absolute top-0.5 right-0.5 w-4 h-4 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <FontAwesomeIcon icon={faXmark} className="w-2.5 h-2.5 text-white" />
+                    </button>
+                  </div>
+                ))}
+                {isUploading && (
+                  <div className="w-12 h-12 rounded-md border border-gray-200 flex items-center justify-center bg-gray-50">
+                    <FontAwesomeIcon icon={faSpinner} className="w-3 h-3 text-gray-400 animate-spin" />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center gap-1.5">
+              {/* Tiny Image Upload Button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
+                  isUploading
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <FontAwesomeIcon icon={faImage} className="w-3 h-3" />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageSelect}
+                className="hidden"
+                disabled={isUploading}
+              />
+
+              {/* Tiny Input */}
+              <div className="flex-1 relative">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  placeholder="Message..."
+                  className="w-full px-3 py-1.5 text-xs bg-white text-gray-900 placeholder-gray-400 border border-gray-200 rounded-full outline-none focus:border-gray-300 resize-none"
+                  rows={1}
+                  style={{ minHeight: '28px', maxHeight: '80px' }}
+                  disabled={isUploading}
+                />
+              </div>
+
+              {/* Tiny Send Button */}
+              <button
+                onClick={handleSend}
+                disabled={(!input.trim() && selectedFiles.length === 0) || isLoading || isUploading}
+                className={`w-7 h-7 rounded-full transition-all flex items-center justify-center flex-shrink-0 ${
+                  (!input.trim() && selectedFiles.length === 0) || isLoading || isUploading
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-900 text-white hover:bg-gray-800'
+                }`}
+              >
+                <FontAwesomeIcon icon={faPaperPlane} className="w-3 h-3" />
+              </button>
             </div>
-          )}
+
+            {/* Ultra Compact Footer */}
+            <div className="flex justify-between items-center mt-1">
+              <p className="text-[8px] text-gray-400">
+                Gemini • Nexios
+              </p>
+              
+              {typeof window !== 'undefined' && getTokenFromUrl() && (
+                <div className="flex items-center gap-0.5 px-1 py-0.5 rounded-full bg-blue-50 text-blue-600">
+                  <FontAwesomeIcon icon={faCheck} className="w-2 h-2" />
+                  <span className="text-[8px] font-medium">Token</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* Animations */}
-      <style jsx>{`
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-5px); }
-        }
-        .animate-bounce {
-          animation: bounce 1s infinite;
-        }
-      `}</style>
     </div>
   );
 }

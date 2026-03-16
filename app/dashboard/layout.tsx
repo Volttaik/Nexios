@@ -1,64 +1,67 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import DashboardHeader from './components/DashboardHeader';
+import { useState, useEffect } from 'react';
 import DashboardSidebar from './components/DashboardSidebar';
+import DashboardHeader from './components/DashboardHeader';
 import type { AppUser } from '@/app/types/user';
+import type { ChatSession } from './components/DashboardSidebar';
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<AppUser | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [currentChatId, setCurrentChatId] = useState<string>();
 
+  // Load user data
   useEffect(() => {
-    // Check if user is logged in
-    const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
-    
-    if (!token || !userData) {
-      router.push('/login');
-      return;
+    if (userData) {
+      setUser(JSON.parse(userData));
     }
+  }, []);
 
-    setUser(JSON.parse(userData));
-  }, [router]);
+  const handleNewChat = (newSession: ChatSession) => {
+    setCurrentChatId(newSession.id);
+    // You might want to navigate to the chat page here
+    window.location.href = '/dashboard/chat';
+  };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
     localStorage.removeItem('user');
-    router.push('/login');
+    localStorage.removeItem('token');
+    window.location.href = '/login';
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Sidebar */}
-      <DashboardSidebar 
-        isOpen={isSidebarOpen} 
-        user={user} 
-        onClose={() => setIsMobileMenuOpen(false)}
-        isMobileOpen={isMobileMenuOpen}
-        onMobileClose={() => setIsMobileMenuOpen(false)}
+    <div className="min-h-screen bg-gray-50">
+      <DashboardSidebar
+        user={user}
+        currentChatId={currentChatId}
+        onChatSelect={setCurrentChatId}
+        onNewChat={handleNewChat}
+        onDeleteChat={(chatId) => console.log('Delete chat:', chatId)}
+        isOpen={isSidebarOpen}
+        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+        isMobileOpen={isMobileOpen}
+        onMobileClose={() => setIsMobileOpen(false)}
+        onMobileOpen={() => setIsMobileOpen(true)}
       />
-
-      {/* Main Content */}
+      
       <div className={`transition-all duration-300 ${
-        isSidebarOpen ? 'md:ml-64' : 'md:ml-20'
+        isSidebarOpen ? 'md:ml-72' : 'md:ml-20'
       }`}>
-        <DashboardHeader 
+        <DashboardHeader
           toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           isSidebarOpen={isSidebarOpen}
           user={user}
           onLogout={handleLogout}
-          onMobileMenuOpen={() => setIsMobileMenuOpen(true)}
+          onMobileMenuOpen={() => setIsMobileOpen(true)}
         />
-
-        {/* Page Content */}
+        
         <main className="p-6">
           {children}
         </main>
