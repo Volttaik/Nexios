@@ -28,13 +28,14 @@ export default function MenuDropdown({ isOpen, onClose }: MenuDropdownProps) {
       event.stopPropagation();
     };
 
-    if (dropdownRef.current) {
-      dropdownRef.current.addEventListener('click', handleClickInside);
+    const currentRef = dropdownRef.current;
+    if (currentRef) {
+      currentRef.addEventListener('click', handleClickInside);
     }
 
     return () => {
-      if (dropdownRef.current) {
-        dropdownRef.current.removeEventListener('click', handleClickInside);
+      if (currentRef) {
+        currentRef.removeEventListener('click', handleClickInside);
       }
     };
   }, []);

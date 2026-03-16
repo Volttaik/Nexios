@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     // Ensure upload directory exists
     try {
       await mkdir(uploadDir, { recursive: true });
-    } catch (_err) {
+    } catch {
       // Directory already exists or can't be created - continue
     }
 
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       filename 
     });
     
-  } catch (_error) {  // Prefix with underscore to mark as intentionally unused
+  } catch {
     console.error('Upload failed:');
     return NextResponse.json(
       { error: 'Upload failed' },
