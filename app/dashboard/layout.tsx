@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardHeader from './components/DashboardHeader';
 import DashboardSidebar from './components/DashboardSidebar';
-import { useSubdomain } from '@/app/components/SubdomainHandler';
 import type { AppUser } from '@/app/types/user';
 
 export default function DashboardLayout({
@@ -16,7 +15,6 @@ export default function DashboardLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<AppUser | null>(null);
-  const subdomain = useSubdomain(); // 👈 Hook is used here
 
   useEffect(() => {
     // Check if user is logged in
@@ -58,7 +56,6 @@ export default function DashboardLayout({
           user={user}
           onLogout={handleLogout}
           onMobileMenuOpen={() => setIsMobileMenuOpen(true)}
-          subdomain={subdomain} // 👈 Passed to header
         />
 
         {/* Page Content */}

@@ -12,14 +12,12 @@ import {
   faSun,
   faMoon
 } from '@fortawesome/free-solid-svg-icons';
-import { useSubdomain } from '@/app/components/SubdomainHandler';
 import type { AppUser } from '@/app/types/user';
 
 export default function DashboardPage() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [darkMode, setDarkMode] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const subdomain = useSubdomain();
 
   // Handle hydration and dark mode
   useEffect(() => {
@@ -87,7 +85,6 @@ export default function DashboardPage() {
           <p className={`text-sm ${
             darkMode ? 'text-gray-400' : 'text-gray-500'
           }`}>
-            {subdomain && <span className="mr-2">📍 {subdomain}.nexios.ai</span>}
             Here&apos;s what&apos;s happening with your account today.
           </p>
         </div>
@@ -314,7 +311,7 @@ export default function DashboardPage() {
       <div className={`mt-8 text-center text-xs ${
         darkMode ? 'text-gray-500' : 'text-gray-400'
       }`}>
-        <p>Nexios AI Dashboard {subdomain && `• ${subdomain}`}</p>
+        <p>Nexios AI Dashboard</p>
       </div>
     </div>
   );

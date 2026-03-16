@@ -17,7 +17,6 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import ShareableLink from '@/app/components/ShareableLink';
 import LoadingSpinner from '@/app/components/LoadingSpinner';
-import { useSubdomain } from '@/app/components/SubdomainHandler';
 import { getTokenFromUrl } from '@/app/lib/tokenUtils';
 import type { AppUser } from '@/app/types/user';
 
@@ -44,7 +43,6 @@ export default function ChatPage() {
   const [showAttachments, setShowAttachments] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  const subdomain = useSubdomain();
 
   // Handle hydration
   useEffect(() => {
@@ -377,7 +375,7 @@ export default function ChatPage() {
           <p className={`text-[10px] ${
             darkMode ? 'text-gray-500' : 'text-gray-400'
           }`}>
-            Powered by Google Gemini • Nexios AI {subdomain && `• ${subdomain}`}
+            Powered by Google Gemini • Nexios AI
           </p>
           
           {/* Token Status Indicator */}
