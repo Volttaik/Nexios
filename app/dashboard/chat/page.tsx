@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import DashboardSidebar, { ChatSession } from '../components/DashboardSidebar';
 import type { AppUser } from '@/app/types/user';
@@ -32,7 +32,7 @@ function renderMarkdown(text: string) {
   for (const part of parts) {
     if (part.startsWith('```')) {
       const lines = part.split('\n');
-      const lang = lines[0].replace('```', '').trim();
+      const _lang = lines[0].replace('```', '').trim(); void _lang;
       const code = lines.slice(1, -1).join('\n');
       elements.push(<pre key={key++} className="my-2 rounded-xl overflow-x-auto text-xs leading-relaxed p-4 font-mono" style={{ background: '#1e1e2e', color: '#a6e3a1' }}><code>{code}</code></pre>);
     } else if (part.startsWith('`') && part.endsWith('`')) {

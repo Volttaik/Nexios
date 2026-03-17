@@ -44,7 +44,6 @@ export default function ProfilePage() {
   const totalTokens = Math.floor(sessions.reduce((a, s) => a + s.messages.reduce((b, m) => b + m.text.length, 0), 0) / 4);
   const projects = (() => { try { return JSON.parse(localStorage.getItem('nexios-projects') || '[]').length; } catch { return 0; } })();
   const memberSince = user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown';
-  const configuredProviders = Object.entries(settings.providers).filter(([, v]) => v.apiKey || v.enabled).length;
 
   const card = { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, padding: 24 };
 

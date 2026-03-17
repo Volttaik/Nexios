@@ -101,7 +101,7 @@ export default function SettingsPage() {
       {/* AI Providers */}
       <div style={card}>
         <h2 className="text-sm font-bold mb-1" style={{ color: 'var(--text)' }}>AI Providers</h2>
-        <p className="text-xs mb-4" style={{ color: 'var(--text2)' }}>Configure providers and API keys. Leave blank to use the app's default key.</p>
+        <p className="text-xs mb-4" style={{ color: 'var(--text2)' }}>Configure providers and API keys. Leave blank to use the app&apos;s default key.</p>
         <div className="space-y-3">
           {AI_PROVIDERS.map(provider => {
             const config = settings.providers[provider.id];

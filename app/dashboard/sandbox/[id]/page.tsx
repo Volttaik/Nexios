@@ -7,7 +7,6 @@ import { useAI } from '@/app/context/AIContext';
 import { callAI } from '@/app/lib/ai';
 import DashboardSidebar from '../../components/DashboardSidebar';
 import type { AppUser } from '@/app/types/user';
-import type { ChatSession } from '../../components/DashboardSidebar';
 
 /* ── Icons ────────────────────────────────────────────────────────────────── */
 const I = {
@@ -24,7 +23,6 @@ const I = {
   Copy: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>,
 };
 
-const LANG_EXT: Record<string, string> = { javascript: 'js', typescript: 'ts', python: 'py', rust: 'rs', go: 'go', html: 'html', css: 'css' };
 
 interface AIMessage { role: 'user' | 'ai'; text: string; }
 
@@ -42,7 +40,7 @@ export default function SandboxPage() {
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(true);
-  const [showFileTree, setShowFileTree] = useState(true);
+  const [showFileTree, _setShowFileTree] = useState(true);
   const [newFileName, setNewFileName] = useState('');
   const [showNewFile, setShowNewFile] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -172,7 +170,7 @@ export default function SandboxPage() {
       const apiKey = getApiKey(activeProvider.id);
       const response = await callAI(activeProvider.id, activeModel.id, messages, apiKey);
       setAiMessages(prev => [...prev, { role: 'ai', text: response }]);
-    } catch (err) {
+    } catch (_err) {
       setAiMessages(prev => [...prev, { role: 'ai', text: '⚠️ Error communicating with AI. Check your API key in the sidebar.' }]);
     } finally {
       setAiLoading(false);

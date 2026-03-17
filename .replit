@@ -4,7 +4,7 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["nano"]
+packages = ["nano", "gh"]
 
 [workflows]
 runButton = "Project"

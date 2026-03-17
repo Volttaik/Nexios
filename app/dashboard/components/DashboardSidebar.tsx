@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { AppUser } from '@/app/types/user';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '@/app/context/ThemeContext';
-import { useAI, AI_PROVIDERS, type AIProviderConfig } from '@/app/context/AIContext';
+import { useAI, AI_PROVIDERS } from '@/app/context/AIContext';
 
 /* ── Types ───────────────────────────────────────────────────────────────── */
 export interface Message {
@@ -115,7 +115,7 @@ function genId() { return Date.now().toString(36) + Math.random().toString(36).s
 export default function DashboardSidebar({
   user, currentChatId, onChatSelect, onNewChat, onDeleteChat, onRenameChat,
   onLogout, isOpen, onToggle, isMobileOpen, onMobileClose, onMobileOpen,
-  selectedModel: externalModel, onModelChange,
+  selectedModel: _externalModel, onModelChange: _onModelChange,
 }: DashboardSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -123,7 +123,6 @@ export default function DashboardSidebar({
   const { settings, activeProvider, activeModel, updateProviderConfig, setActiveProvider, setActiveModel, getApiKey } = useAI();
 
   const isChatPage = pathname === '/dashboard/chat';
-  const isProjectsPage = pathname.startsWith('/dashboard/projects') || pathname.startsWith('/dashboard/sandbox');
 
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
