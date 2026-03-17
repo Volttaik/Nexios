@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { HiBell, HiOutlineMenuAlt2, HiSearch, HiSun, HiMoon } from 'react-icons/hi';
+import { HiBell, HiOutlineMenuAlt2, HiSearch, HiSun, HiMoon, HiX } from 'react-icons/hi';
 import UserDropdown from './UserDropdown';
 import type { AppUser } from '@/app/types/user';
 import { useTheme } from '@/app/context/ThemeContext';
@@ -19,13 +19,12 @@ export default function DashboardHeader({ toggleSidebar, isSidebarOpen, user, on
   const [searchFocused, setSearchFocused] = useState(false);
   const { isDark, toggleTheme } = useTheme();
 
-  const sidebarOffset = isSidebarOpen ? 'md:left-60' : 'md:left-[72px]';
-
   return (
-    <header className={`fixed top-0 right-0 left-0 ${sidebarOffset} h-14 z-30 flex items-center px-4 gap-3 transition-all duration-300`}
+    <header
+      className={`fixed top-0 right-0 h-14 z-30 flex items-center px-4 gap-3 transition-all duration-300 ${isSidebarOpen ? 'left-0 md:left-60' : 'left-0'}`}
       style={{ background: 'var(--bg-secondary)', backdropFilter: 'blur(24px)', borderBottom: '1px solid var(--glass-border)', WebkitBackdropFilter: 'blur(24px)' }}>
 
-      {/* Mobile menu */}
+      {/* Mobile menu button */}
       <button onClick={onMobileMenuOpen} className="md:hidden p-2 rounded-lg transition-colors"
         style={{ color: 'var(--text-secondary)' }}
         onMouseOver={e => (e.currentTarget.style.color = 'var(--text-primary)')}
@@ -33,18 +32,18 @@ export default function DashboardHeader({ toggleSidebar, isSidebarOpen, user, on
         <HiOutlineMenuAlt2 className="w-5 h-5" />
       </button>
 
-      {/* Toggle sidebar desktop */}
-      <button onClick={toggleSidebar} className="hidden md:flex p-2 rounded-lg transition-colors"
+      {/* Desktop sidebar toggle — always visible, outside the sidebar */}
+      <button onClick={toggleSidebar} className="hidden md:flex p-2 rounded-lg transition-colors items-center justify-center"
+        title={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
         style={{ color: 'var(--text-secondary)' }}
         onMouseOver={e => (e.currentTarget.style.color = 'var(--text-primary)')}
         onMouseOut={e => (e.currentTarget.style.color = 'var(--text-secondary)')}>
-        <HiOutlineMenuAlt2 className="w-5 h-5" />
+        {isSidebarOpen ? <HiX className="w-5 h-5" /> : <HiOutlineMenuAlt2 className="w-5 h-5" />}
       </button>
 
       {/* Search */}
       <div className="flex-1 max-w-sm relative hidden sm:block">
-        <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
-          style={{ color: 'var(--text-muted)' }} />
+        <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
         <input
           type="text"
           placeholder="Search projects, files, APIs..."
@@ -52,7 +51,7 @@ export default function DashboardHeader({ toggleSidebar, isSidebarOpen, user, on
           onBlur={() => setSearchFocused(false)}
           className="w-full pl-9 pr-4 py-2 text-xs rounded-xl transition-all outline-none"
           style={{
-            background: searchFocused ? 'var(--input-bg)' : 'var(--input-bg)',
+            background: 'var(--input-bg)',
             border: `1px solid ${searchFocused ? 'var(--input-border-focus)' : 'var(--input-border)'}`,
             color: 'var(--text-primary)',
             boxShadow: searchFocused ? '0 0 0 3px var(--accent-glow)' : 'none',
