@@ -2,506 +2,164 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faRobot,
-  faBolt,
-  faChartLine,
-  faFileAlt,
-  faArrowRight,
-  faSun,
-  faMoon,
-  faComments,
-  faMessage
-} from '@fortawesome/free-solid-svg-icons';
 import type { AppUser } from '@/app/types/user';
 import type { ChatSession } from './components/DashboardSidebar';
+import { useAI } from '@/app/context/AIContext';
+import { useTheme } from '@/app/context/ThemeContext';
+
+const StatIcon = ({ color, children }: { color: string; children: React.ReactNode }) => (
+  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: color + '20' }}>
+    <div style={{ color }}>{children}</div>
+  </div>
+);
 
 export default function DashboardPage() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [darkMode, setDarkMode] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [stats, setStats] = useState({
-    totalChats: 0,
-    totalMessages: 0,
-    uniqueModels: 0,
-    avgResponseTime: '0s',
-    documentsCount: 0,
-    accuracyRate: '0%'
-  });
+  const { activeProvider, activeModel } = useAI();
+  const { isDark, toggleTheme } = useTheme();
 
   useEffect(() => {
     setMounted(true);
-    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
-    setDarkMode(savedDarkMode);
-    
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      setUser(JSON.parse(userData));
-    }
-
-    // Load real chat sessions
-    const savedSessions = localStorage.getItem('chatSessions');
-    if (savedSessions) {
-      try {
-        const parsed: any[] = JSON.parse(savedSessions);
-        const sessionsWithDates: ChatSession[] = parsed.map((s: any) => ({
-          ...s,
-          createdAt: new Date(s.createdAt),
-          updatedAt: new Date(s.updatedAt),
-          messages: s.messages.map((m: any) => ({
-            ...m,
-            timestamp: new Date(m.timestamp)
-          }))
-        }));
-        setSessions(sessionsWithDates);
-        
-        // Calculate real stats
-        const totalMessages = sessionsWithDates.reduce(
-          (acc: number, session: ChatSession) => acc + session.messages.length, 
-          0
-        );
-        
-        // Calculate average response time (mock for now - you'd need real timestamps)
-        const avgTime = calculateAvgResponseTime(sessionsWithDates);
-        
-        // Get unique models used (you'd need to track this in your messages)
-        const models = new Set<string>();
-        sessionsWithDates.forEach((session: ChatSession) => {
-          session.messages.forEach((msg: any) => {
-            if (msg.sender === 'ai' && msg.model) {
-              models.add(msg.model as string);
-            }
-          });
-        });
-
-        setStats({
-          totalChats: sessionsWithDates.length,
-          totalMessages,
-          uniqueModels: models.size || 3, // Default to 3 if no data
-          avgResponseTime: avgTime,
-          documentsCount: sessionsWithDates.filter(s => 
-            s.messages.some(m => m.imageUrls && m.imageUrls.length > 0)
-          ).length,
-          accuracyRate: calculateAccuracyRate(sessionsWithDates)
-        });
-      } catch (error) {
-        console.error('Failed to load sessions:', error);
-      }
-    }
+    const u = localStorage.getItem('user');
+    if (u) setUser(JSON.parse(u));
+    const s = localStorage.getItem('chatSessions');
+    if (s) { try { const p = JSON.parse(s); setSessions(p.map((x: Record<string, unknown>) => ({ ...x, createdAt: new Date(x.createdAt as string), updatedAt: new Date(x.updatedAt as string), messages: (x.messages as Array<Record<string, unknown>>).map(m => ({ ...m, timestamp: new Date(m.timestamp as string) })) }))); } catch { /* ignore */ } }
   }, []);
-
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    localStorage.setItem('darkMode', darkMode.toString());
-  }, [darkMode]);
-
-  const calculateAvgResponseTime = (sessions: ChatSession[]): string => {
-    // This is a placeholder - you'd need actual response time tracking
-    // For now, return a mock value based on number of messages
-    if (sessions.length === 0) return '0s';
-    const totalMessages = sessions.reduce((acc, s) => acc + s.messages.length, 0);
-    const avgTime = Math.floor(totalMessages / sessions.length) * 0.5;
-    return `${avgTime.toFixed(1)}s`;
-  };
-
-  const calculateAccuracyRate = (sessions: ChatSession[]): string => {
-    // This is a placeholder - you'd need actual feedback/rating system
-    // Return a mock rate based on session count
-    if (sessions.length === 0) return '0%';
-    const baseRate = 95 + (sessions.length % 5);
-    return `${baseRate}%`;
-  };
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    let timeGreeting = '';
-    if (hour < 12) timeGreeting = 'Good morning';
-    else if (hour < 18) timeGreeting = 'Good afternoon';
-    else timeGreeting = 'Good evening';
-
-    if (user?.fullName) {
-      return `${timeGreeting}, ${user.fullName.split(' ')[0]}! 👋`;
-    }
-    return `${timeGreeting}! 👋`;
-  };
-
-  const formatDate = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor(diff / (1000 * 60));
-    
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days === 1) return 'Yesterday';
-    if (days < 7) return `${days}d ago`;
-    return date.toLocaleDateString();
-  };
-
-  const getTotalTokens = () => {
-    // Estimate tokens based on message length
-    const totalChars = sessions.reduce((acc: number, session: ChatSession) => 
-      acc + session.messages.reduce((msgAcc: number, msg: { text: string }) => 
-        msgAcc + msg.text.length, 0
-      ), 0
-    );
-    return Math.floor(totalChars / 4); // Rough estimate: 1 token ≈ 4 chars
-  };
 
   if (!mounted) return null;
 
-  const statCards = [
-    { 
-      label: 'Total Chats', 
-      value: stats.totalChats.toString(), 
-      change: `+${Math.floor(stats.totalChats * 0.2)}%`, 
-      icon: faComments,
-      color: 'blue'
-    },
-    { 
-      label: 'Messages', 
-      value: stats.totalMessages.toString(), 
-      change: `+${Math.floor(stats.totalMessages * 0.15)}`, 
-      icon: faMessage,
-      color: 'green'
-    },
-    { 
-      label: 'Tokens Used', 
-      value: getTotalTokens().toLocaleString(), 
-      change: `+${Math.floor(getTotalTokens() * 0.1)}`, 
-      icon: faBolt,
-      color: 'purple'
-    },
-    { 
-      label: 'Documents', 
-      value: stats.documentsCount.toString(), 
-      change: `+${Math.floor(stats.documentsCount * 0.1)}`, 
-      icon: faFileAlt,
-      color: 'orange'
-    },
+  const totalMessages = sessions.reduce((a, s) => a + s.messages.length, 0);
+  const totalTokens = Math.floor(sessions.reduce((a, s) => a + s.messages.reduce((b, m) => b + m.text.length, 0), 0) / 4);
+  const projects = (() => { try { return JSON.parse(localStorage.getItem('nexios-projects') || '[]').length; } catch { return 0; } })();
+
+  const greeting = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; };
+  const formatDate = (d: Date) => { const diff = Date.now() - new Date(d).getTime(); const days = Math.floor(diff / 86400000); if (days === 0) return 'Today'; if (days === 1) return 'Yesterday'; return `${days}d ago`; };
+
+  const stats = [
+    { label: 'Chat Sessions', value: sessions.length, color: '#3b82f6', icon: <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7z" clipRule="evenodd" /></svg> },
+    { label: 'Messages', value: totalMessages, color: '#8b5cf6', icon: <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"/><path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z"/></svg> },
+    { label: 'Est. Tokens', value: totalTokens.toLocaleString(), color: '#10b981', icon: <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" /></svg> },
+    { label: 'Projects', value: projects, color: '#f59e0b', icon: <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5"><path fillRule="evenodd" d="M2 6a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1H8a3 3 0 00-3 3v1.5a1.5 1.5 0 01-3 0V6z" clipRule="evenodd" /><path d="M6 12a2 2 0 012-2h8a2 2 0 012 2v2a2 2 0 01-2 2H2h2a2 2 0 01-2-2v-2z" /></svg> },
   ];
 
-  const recentChats = sessions.slice(0, 5).map(session => ({
-    id: session.id,
-    title: session.title,
-    date: formatDate(session.updatedAt),
-    preview: session.messages[session.messages.length - 1]?.text.slice(0, 60) + '...' || 'No messages',
-    messageCount: session.messages.length,
-    lastActive: session.updatedAt
-  }));
+  const quickLinks = [
+    { href: '/dashboard/chat', label: 'New Chat', color: '#3b82f6' },
+    { href: '/dashboard/projects', label: 'Projects', color: '#8b5cf6' },
+    { href: '/dashboard/analytics', label: 'Analytics', color: '#10b981' },
+    { href: '/dashboard/settings', label: 'Settings', color: '#f59e0b' },
+  ];
 
   return (
-    <div className={`transition-colors duration-300 min-h-full ${
-      darkMode ? 'dark bg-gray-900' : 'bg-white'
-    }`}>
-      {/* Header with Greeting and Dark Mode Toggle */}
-      <div className="flex justify-between items-center mb-8">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-2xl font-bold ${
-            darkMode ? 'text-white' : 'text-gray-900'
-          }`}>
-            {getGreeting()}
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>
+            {greeting()}, {user?.fullName?.split(' ')[0] || 'Dev'} 👋
           </h1>
-          <p className={`text-sm ${
-            darkMode ? 'text-gray-400' : 'text-gray-500'
-          }`}>
-            {sessions.length > 0 
-              ? `You have ${sessions.length} active chat sessions` 
-              : 'Start a new conversation with AI'}
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text2)' }}>
+            {sessions.length > 0 ? `${sessions.length} active sessions · ${activeProvider.shortName}/${activeModel.name}` : `Welcome to Nexios AI · Using ${activeProvider.shortName}`}
           </p>
         </div>
-        
-        <button
-          onClick={() => setDarkMode(!darkMode)}
-          className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-            darkMode 
-              ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' 
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          <FontAwesomeIcon icon={darkMode ? faSun : faMoon} className="w-4 h-4" />
+        <button onClick={toggleTheme} className="w-9 h-9 rounded-xl flex items-center justify-center border transition-all hover:scale-105"
+          style={{ background: 'var(--bg2)', borderColor: 'var(--border)', color: 'var(--text2)' }}
+          title={isDark ? 'Light mode' : 'Dark mode'}>
+          {isDark
+            ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+          }
         </button>
       </div>
 
-      {/* Stats Grid - Real Data */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {statCards.map((stat, index) => (
-          <div
-            key={index}
-            className={`p-6 rounded-xl border transition-all ${
-              darkMode 
-                ? 'bg-gray-800 border-gray-700 hover:border-gray-600' 
-                : 'bg-white border-gray-200 hover:border-gray-300'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                darkMode ? 'bg-gray-700' : `bg-${stat.color}-50`
-              }`}>
-                <FontAwesomeIcon icon={stat.icon} className={`w-5 h-5 ${
-                  darkMode ? `text-${stat.color}-400` : `text-${stat.color}-600`
-                }`} />
-              </div>
-              {parseInt(stat.change) > 0 && (
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                  darkMode 
-                    ? 'bg-green-900/30 text-green-400' 
-                    : 'bg-green-100 text-green-700'
-                }`}>
-                  {stat.change}
-                </span>
-              )}
-            </div>
-            <h3 className={`text-2xl font-bold mb-1 ${
-              darkMode ? 'text-white' : 'text-gray-900'
-            }`}>
-              {stat.value}
-            </h3>
-            <p className={`text-sm ${
-              darkMode ? 'text-gray-400' : 'text-gray-500'
-            }`}>
-              {stat.label}
-            </p>
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((s, i) => (
+          <div key={i} className="rounded-2xl border p-5 hover:shadow-md transition-all" style={{ background: 'var(--bg2)', borderColor: 'var(--border)' }}>
+            <StatIcon color={s.color}>{s.icon}</StatIcon>
+            <p className="text-2xl font-bold mt-3" style={{ color: 'var(--text)' }}>{s.value}</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text2)' }}>{s.label}</p>
           </div>
         ))}
       </div>
 
-      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Chats - Real Data */}
-        <div className="lg:col-span-2">
-          <div className={`p-6 rounded-xl border ${
-            darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-          }`}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className={`text-lg font-bold ${
-                darkMode ? 'text-white' : 'text-gray-900'
-              }`}>
-                Recent Conversations
-              </h2>
-              <Link
-                href="/dashboard/chat"
-                className={`text-sm flex items-center gap-1 ${
-                  darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
-                }`}
-              >
-                View all
-                <FontAwesomeIcon icon={faArrowRight} className="w-3 h-3" />
+        {/* Recent chats */}
+        <div className="lg:col-span-2 rounded-2xl border p-6" style={{ background: 'var(--bg2)', borderColor: 'var(--border)' }}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-bold" style={{ color: 'var(--text)' }}>Recent Conversations</h2>
+            <Link href="/dashboard/chat" className="text-sm text-blue-500 hover:text-blue-400 transition-colors">View all →</Link>
+          </div>
+          {sessions.length > 0 ? (
+            <div className="space-y-1">
+              {sessions.slice(0, 6).map(s => (
+                <Link key={s.id} href="/dashboard/chat"
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all hover:scale-[1.01]"
+                  style={{ background: 'var(--bg3)' } as React.CSSProperties}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: activeProvider.color }}>
+                    {activeProvider.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{s.title}</p>
+                    <p className="text-xs truncate" style={{ color: 'var(--text3)' }}>{s.messages.length} messages</p>
+                  </div>
+                  <span className="text-xs shrink-0" style={{ color: 'var(--text3)' }}>{formatDate(s.updatedAt)}</span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center" style={{ background: 'var(--bg3)' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-6 h-6" style={{ color: 'var(--text3)' }}>
+                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                </svg>
+              </div>
+              <p className="text-sm mb-3" style={{ color: 'var(--text2)' }}>No conversations yet</p>
+              <Link href="/dashboard/chat" className="inline-block px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors" style={{ background: 'var(--text)' }}>
+                Start chatting
               </Link>
             </div>
-            
-            {recentChats.length > 0 ? (
-              <div className="space-y-3">
-                {recentChats.map((chat) => (
-                  <Link
-                    key={chat.id}
-                    href={`/dashboard/chat?chatId=${chat.id}`}
-                    className={`block p-4 rounded-lg transition-colors ${
-                      darkMode 
-                        ? 'hover:bg-gray-700' 
-                        : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className={`font-medium ${
-                            darkMode ? 'text-white' : 'text-gray-900'
-                          }`}>
-                            {chat.title}
-                          </h3>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {chat.messageCount} messages
-                          </span>
-                        </div>
-                        <p className={`text-sm ${
-                          darkMode ? 'text-gray-400' : 'text-gray-500'
-                        }`}>
-                          {chat.preview}
-                        </p>
-                      </div>
-                      <span className={`text-xs whitespace-nowrap ml-4 ${
-                        darkMode ? 'text-gray-500' : 'text-gray-400'
-                      }`}>
-                        {chat.date}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className={`text-center py-12 ${
-                darkMode ? 'text-gray-400' : 'text-gray-500'
-              }`}>
-                <FontAwesomeIcon icon={faComments} className="w-12 h-12 mb-3 opacity-20" />
-                <p>No conversations yet</p>
-                <Link
-                  href="/dashboard/chat"
-                  className={`inline-block mt-3 px-4 py-2 text-sm rounded-lg ${
-                    darkMode 
-                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                      : 'bg-black text-white hover:bg-gray-800'
-                  }`}
-                >
-                  Start a new chat
-                </Link>
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* Quick Stats & Actions */}
-        <div className="space-y-6">
-          {/* Session Stats */}
-          <div className={`p-6 rounded-xl border ${
-            darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-          }`}>
-            <h2 className={`text-lg font-bold mb-4 ${
-              darkMode ? 'text-white' : 'text-gray-900'
-            }`}>
-              Session Overview
-            </h2>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Active Sessions
-                </span>
-                <span className={`font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {sessions.length}
-                </span>
+        {/* Right column */}
+        <div className="space-y-4">
+          {/* Active AI */}
+          <div className="rounded-2xl border p-5" style={{ background: 'var(--bg2)', borderColor: 'var(--border)' }}>
+            <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text)' }}>Active AI</h2>
+            <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--bg3)' }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm" style={{ background: activeProvider.color }}>
+                {activeProvider.icon}
               </div>
-              <div className="flex justify-between items-center">
-                <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Avg. Response Time
-                </span>
-                <span className={`font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {stats.avgResponseTime}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Models Used
-                </span>
-                <span className={`font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {stats.uniqueModels}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Accuracy Rate
-                </span>
-                <span className={`font-bold text-green-500`}>
-                  {stats.accuracyRate}
-                </span>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{activeProvider.name}</p>
+                <p className="text-xs" style={{ color: 'var(--text3)' }}>{activeModel.name} · {activeModel.description}</p>
               </div>
             </div>
+            <Link href="/dashboard/settings" className="block mt-3 text-xs text-center py-2 rounded-xl border transition-colors hover:border-blue-500"
+              style={{ color: 'var(--text2)', borderColor: 'var(--border)' }}>
+              Manage providers →
+            </Link>
           </div>
 
-          {/* Quick Actions */}
-          <div className={`p-6 rounded-xl border ${
-            darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-          }`}>
-            <h2 className={`text-lg font-bold mb-4 ${
-              darkMode ? 'text-white' : 'text-gray-900'
-            }`}>
-              Quick Actions
-            </h2>
-            <div className="grid grid-cols-2 gap-3">
-              <Link
-                href="/dashboard/chat"
-                className={`p-3 rounded-lg text-center transition-colors ${
-                  darkMode 
-                    ? 'bg-gray-700 hover:bg-gray-600' 
-                    : 'bg-gray-100 hover:bg-gray-200'
-                }`}
-              >
-                <FontAwesomeIcon icon={faRobot} className={`w-4 h-4 mb-1 ${
-                  darkMode ? 'text-blue-400' : 'text-gray-700'
-                }`} />
-                <span className={`block text-xs ${
-                  darkMode ? 'text-gray-300' : 'text-gray-700'
-                }`}>
-                  New Chat
-                </span>
-              </Link>
-              
-              <Link
-                href="/dashboard/documents"
-                className={`p-3 rounded-lg text-center transition-colors ${
-                  darkMode 
-                    ? 'bg-gray-700 hover:bg-gray-600' 
-                    : 'bg-gray-100 hover:bg-gray-200'
-                }`}
-              >
-                <FontAwesomeIcon icon={faFileAlt} className={`w-4 h-4 mb-1 ${
-                  darkMode ? 'text-purple-400' : 'text-gray-700'
-                }`} />
-                <span className={`block text-xs ${
-                  darkMode ? 'text-gray-300' : 'text-gray-700'
-                }`}>
-                  Documents
-                </span>
-              </Link>
-              
-              <Link
-                href="/dashboard/analytics"
-                className={`p-3 rounded-lg text-center transition-colors ${
-                  darkMode 
-                    ? 'bg-gray-700 hover:bg-gray-600' 
-                    : 'bg-gray-100 hover:bg-gray-200'
-                }`}
-              >
-                <FontAwesomeIcon icon={faChartLine} className={`w-4 h-4 mb-1 ${
-                  darkMode ? 'text-green-400' : 'text-gray-700'
-                }`} />
-                <span className={`block text-xs ${
-                  darkMode ? 'text-gray-300' : 'text-gray-700'
-                }`}>
-                  Analytics
-                </span>
-              </Link>
-              
-              <Link
-                href="/dashboard/settings"
-                className={`p-3 rounded-lg text-center transition-colors ${
-                  darkMode 
-                    ? 'bg-gray-700 hover:bg-gray-600' 
-                    : 'bg-gray-100 hover:bg-gray-200'
-                }`}
-              >
-                <FontAwesomeIcon icon={faBolt} className={`w-4 h-4 mb-1 ${
-                  darkMode ? 'text-yellow-400' : 'text-gray-700'
-                }`} />
-                <span className={`block text-xs ${
-                  darkMode ? 'text-gray-300' : 'text-gray-700'
-                }`}>
-                  Settings
-                </span>
-              </Link>
+          {/* Quick links */}
+          <div className="rounded-2xl border p-5" style={{ background: 'var(--bg2)', borderColor: 'var(--border)' }}>
+            <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text)' }}>Quick Actions</h2>
+            <div className="grid grid-cols-2 gap-2">
+              {quickLinks.map(l => (
+                <Link key={l.href} href={l.href}
+                  className="flex items-center justify-center py-2.5 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-85 hover:scale-[1.02]"
+                  style={{ background: l.color }}>
+                  {l.label}
+                </Link>
+              ))}
             </div>
           </div>
         </div>
       </div>
-
-      {/* Footer with real-time stats */}
-      {sessions.length > 0 && (
-        <div className={`mt-8 text-center text-xs flex items-center justify-center gap-4 ${
-          darkMode ? 'text-gray-500' : 'text-gray-400'
-        }`}>
-          <span>Last activity: {formatDate(new Date(Math.max(...sessions.map(s => s.updatedAt.getTime()))))}</span>
-          <span>•</span>
-          <span>Total messages: {stats.totalMessages}</span>
-        </div>
-      )}
     </div>
   );
 }
