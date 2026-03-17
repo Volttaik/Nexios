@@ -1,81 +1,67 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import DashboardSidebar from './components/DashboardSidebar';
+import DashboardHeader from './components/DashboardHeader';
+import { useSubdomain } from '@/app/components/SubdomainHandler';
 import type { AppUser } from '@/app/types/user';
-import type { ChatSession } from './components/DashboardSidebar';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AppUser | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [currentChatId, setCurrentChatId] = useState<string>();
+  const router = useRouter();
   const pathname = usePathname();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<AppUser | null>(null);
+  const subdomain = useSubdomain();
 
-  const isChatPage = pathname === '/dashboard/chat';
-  const isSandboxPage = pathname.startsWith('/dashboard/sandbox/');
+  // Project workspace gets its own full-screen layout
+  const isWorkspace = pathname?.includes('/projects/') && pathname?.split('/').length > 4;
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) setUser(JSON.parse(userData));
     const token = localStorage.getItem('token');
-    if (!token) window.location.href = '/login';
-    const saved = localStorage.getItem('nexios-sidebar-open');
-    if (saved !== null) setIsSidebarOpen(saved === 'true');
-  }, []);
-
-  /* Lock body scroll when mobile menu is open */
-  useEffect(() => {
-    if (isMobileOpen) {
-      document.body.classList.add('menu-open');
-    } else {
-      document.body.classList.remove('menu-open');
-    }
-    return () => document.body.classList.remove('menu-open');
-  }, [isMobileOpen]);
-
-  const handleToggle = () => {
-    const next = !isSidebarOpen;
-    setIsSidebarOpen(next);
-    localStorage.setItem('nexios-sidebar-open', String(next));
-  };
-
-  const handleNewChat = (newSession: ChatSession) => {
-    setCurrentChatId(newSession.id);
-    window.location.href = '/dashboard/chat';
-  };
+    const userData = localStorage.getItem('user');
+    if (!token || !userData) { router.push('/login'); return; }
+    setUser(JSON.parse(userData));
+  }, [router]);
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
     localStorage.removeItem('token');
-    window.location.href = '/login';
+    localStorage.removeItem('user');
+    document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+    router.push('/login');
   };
 
-  const handleMobileOpen = () => setIsMobileOpen(true);
-  const handleMobileClose = () => setIsMobileOpen(false);
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
+        <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)' }} />
+      </div>
+    );
+  }
 
-  /* Chat and sandbox pages handle their own full-screen layout */
-  if (isChatPage || isSandboxPage) return <>{children}</>;
-
-  const ml = isSidebarOpen ? 'md:ml-72' : 'md:ml-[64px]';
+  if (isWorkspace) {
+    return <div style={{ background: 'var(--bg-primary)' }}>{children}</div>;
+  }
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
+    <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
       <DashboardSidebar
-        user={user}
-        currentChatId={currentChatId}
-        onChatSelect={setCurrentChatId}
-        onNewChat={handleNewChat}
         isOpen={isSidebarOpen}
-        onToggle={handleToggle}
-        isMobileOpen={isMobileOpen}
-        onMobileClose={handleMobileClose}
-        onMobileOpen={handleMobileOpen}
-        onLogout={handleLogout}
+        user={user}
+        isMobileOpen={isMobileMenuOpen}
+        onMobileClose={() => setIsMobileMenuOpen(false)}
       />
-      <div className={`transition-all duration-300 ${ml} min-h-screen flex flex-col`}>
-        <main className="flex-1 p-4 sm:p-6 max-w-7xl">
+      <div className={`transition-all duration-300 ${isSidebarOpen ? 'md:ml-60' : 'md:ml-[72px]'}`}>
+        <DashboardHeader
+          toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          isSidebarOpen={isSidebarOpen}
+          user={user}
+          onLogout={handleLogout}
+          onMobileMenuOpen={() => setIsMobileMenuOpen(true)}
+          subdomain={subdomain}
+        />
+        <main className="p-6 pt-20">
           {children}
         </main>
       </div>
