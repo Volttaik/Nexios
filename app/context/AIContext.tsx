@@ -82,7 +82,9 @@ export const AI_PROVIDERS: AIProvider[] = [
     apiKeyPlaceholder: 'sk-ant-...',
     icon: 'Cl',
     models: [
-      { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', description: 'Best intelligence', supportsImages: true, supportsCode: true },
+      { id: 'claude-opus-4-5', name: 'Claude Opus 4.5', description: 'Most intelligent', supportsImages: true, supportsCode: true },
+      { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', description: 'Best balance', supportsImages: true, supportsCode: true },
+      { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', description: 'Great intelligence', supportsImages: true, supportsCode: true },
       { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', description: 'Fast & efficient', supportsImages: true, supportsCode: true },
       { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', description: 'Lightweight', supportsImages: true, supportsCode: true },
     ],
@@ -99,6 +101,21 @@ export const AI_PROVIDERS: AIProvider[] = [
       { id: 'mistral-large-latest', name: 'Mistral Large', description: 'Most powerful', supportsImages: false, supportsCode: true },
       { id: 'mistral-small-latest', name: 'Mistral Small', description: 'Fast & efficient', supportsImages: false, supportsCode: true },
       { id: 'codestral-latest', name: 'Codestral', description: 'Code specialist', supportsImages: false, supportsCode: true },
+    ],
+  },
+  {
+    id: 'xai',
+    name: 'xAI Grok',
+    shortName: 'Grok',
+    color: '#1DA1F2',
+    bgGradient: 'from-sky-500 to-blue-600',
+    apiKeyPlaceholder: 'xai-...',
+    icon: 'Xg',
+    models: [
+      { id: 'grok-3', name: 'Grok 3', description: 'Most capable Grok', supportsImages: false, supportsCode: true },
+      { id: 'grok-3-mini', name: 'Grok 3 Mini', description: 'Fast & efficient', supportsImages: false, supportsCode: true },
+      { id: 'grok-2-vision-1212', name: 'Grok 2 Vision', description: 'Vision + code', supportsImages: true, supportsCode: true },
+      { id: 'grok-2-1212', name: 'Grok 2', description: 'Previous generation', supportsImages: false, supportsCode: true },
     ],
   },
 ];
@@ -122,6 +139,7 @@ const DEFAULT_SETTINGS: AISettings = {
     openai: { apiKey: '', selectedModel: 'gpt-4o', enabled: false },
     anthropic: { apiKey: '', selectedModel: 'claude-3-5-sonnet-20241022', enabled: false },
     mistral: { apiKey: '', selectedModel: 'mistral-large-latest', enabled: false },
+    xai: { apiKey: '', selectedModel: 'grok-3', enabled: false },
   },
 };
 
@@ -184,7 +202,7 @@ export function AIProvider({ children }: { children: ReactNode }) {
         activeProvider: providerId,
         providers: {
           ...prev.providers,
-          [providerId]: { ...prev.providers[providerId], enabled: true },
+          [providerId]: { ...(prev.providers[providerId] || { apiKey: '', selectedModel: AI_PROVIDERS.find(p => p.id === providerId)?.models[0]?.id || '', enabled: true }), enabled: true },
         },
       };
       localStorage.setItem('nexios-ai-settings', JSON.stringify(next));
