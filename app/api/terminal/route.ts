@@ -7,6 +7,7 @@ import { tmpdir } from 'os';
 
 const execAsync = promisify(exec);
 
+// ── Hard-blocked destructive commands ───────────────────────────
 const BLOCKED_PATTERNS = [
   /rm\s+-rf\s+\//,
   /shutdown/,
@@ -28,6 +29,63 @@ function sanitizeProjectId(id: string): string {
   return id.replace(/[^a-zA-Z0-9-_]/g, '-').slice(0, 40);
 }
 
+// ── apt / apt-get interceptor ────────────────────────────────────
+// This environment runs on Replit's NixOS — apt/apt-get are wrapper
+// scripts that print guidance and exit 1. We intercept them here to
+// provide a clean, actionable response instead of a raw error.
+function tryInterceptApt(cmd: string): string | null {
+  const aptMatch = cmd.match(/^apt(?:-get)?\s+install\s+(?:-y\s+)?(.+)/i);
+  if (!aptMatch) {
+    if (/^apt(?:-get)?(\s|$)/i.test(cmd)) {
+      return [
+        '⚠  apt/apt-get are not available on this system.',
+        '',
+        'This sandbox runs on Replit\'s NixOS environment.',
+        '',
+        'To install Python packages:   pip3 install <package>',
+        'To install Node packages:      npm install <package>',
+        'Example:  pip3 install requests flask numpy',
+      ].join('\n');
+    }
+    return null;
+  }
+
+  const pkg = aptMatch[1].trim();
+  const PYTHON_RUNTIME_PKGS = ['python3', 'python', 'python-is-python3', 'python3-full', 'python3-dev'];
+  const PIP_PKGS = ['python3-pip', 'python-pip', 'pip', 'pip3'];
+
+  if (PYTHON_RUNTIME_PKGS.includes(pkg)) {
+    return [
+      '✓ Python 3.11 is already installed on this system.',
+      '',
+      '  python3 --version    → confirm the version',
+      '  pip3 install <pkg>   → install Python packages',
+      '  python3 script.py    → run a Python script',
+    ].join('\n');
+  }
+
+  if (PIP_PKGS.includes(pkg)) {
+    return [
+      '✓ pip3 is already installed. Use it directly:',
+      '',
+      '  pip3 install <package>',
+      '  pip3 install requests flask numpy pandas',
+    ].join('\n');
+  }
+
+  // Generic apt install → suggest pip3 or npm equivalents
+  return [
+    `⚠  apt install is not available on this NixOS-based system.`,
+    '',
+    `Package requested: ${pkg}`,
+    '',
+    'If this is a Python package:  pip3 install ' + pkg,
+    'If this is a Node package:    npm install ' + pkg,
+    '',
+    'Python 3.11 and pip3 are pre-installed and ready to use.',
+  ].join('\n');
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -40,10 +98,18 @@ export async function POST(request: NextRequest) {
     const cmd = (command || '').trim();
     if (!cmd) return NextResponse.json({ output: 'No command provided', error: true });
 
+    // ── Safety check ──
     if (!isSafe(cmd)) {
-      return NextResponse.json({ output: `Permission denied: command blocked for safety`, error: true });
+      return NextResponse.json({ output: 'Permission denied: command blocked for safety', error: true });
     }
 
+    // ── apt / apt-get interception ──
+    const aptResponse = tryInterceptApt(cmd);
+    if (aptResponse !== null) {
+      return NextResponse.json({ output: aptResponse, error: false });
+    }
+
+    // ── Set up sandbox workspace ──
     const safeId = sanitizeProjectId(projectId || 'workspace');
     const tmpDir = join(tmpdir(), 'nexios-' + safeId);
     await mkdir(tmpDir, { recursive: true });
@@ -70,8 +136,20 @@ export async function POST(request: NextRequest) {
         env: {
           ...process.env,
           HOME: tmpDir,
-          PATH: process.env.PATH || '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+          // Full PATH including all Nix-provided runtimes (python3, pip3, node, npm, etc.)
+          PATH: process.env.PATH || [
+            '/nix/store/6h39ipxhzp4r5in5g4rhdjz7p7fkicd0-replit-runtime-path/bin',
+            '/home/runner/.nix-profile/bin',
+            '/usr/local/sbin',
+            '/usr/local/bin',
+            '/usr/sbin',
+            '/usr/bin',
+            '/sbin',
+            '/bin',
+          ].join(':'),
           NODE_ENV: 'development',
+          PYTHONUNBUFFERED: '1',
+          PIP_NO_CACHE_DIR: '1',
         },
         maxBuffer: 1024 * 1024 * 5,
       });
@@ -87,7 +165,7 @@ export async function POST(request: NextRequest) {
       if (err.killed || err.code === 'ETIMEDOUT') {
         const partialOut = [err.stdout, err.stderr].filter(Boolean).join('\n').trim();
         return NextResponse.json({
-          output: (partialOut ? partialOut + '\n\n' : '') + `⚡ Process is running in background (timeout after ${timeout / 1000}s). Use the Run button to preview.`,
+          output: (partialOut ? partialOut + '\n\n' : '') + `⚡ Process is running in the background (stopped after ${timeout / 1000}s). Use the Run button to preview your project.`,
           error: false,
           cwd: tmpDir,
         });

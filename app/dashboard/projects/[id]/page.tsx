@@ -322,7 +322,8 @@ export default function ProjectWorkspace() {
 
   const [termLines, setTermLines] = useState<TerminalLine[]>([
     { type: 'output', text: '── Nexios Workspace Terminal ──────────────────' },
-    { type: 'success', text: '✓ Sandbox ready — npm, node, python3 available' },
+    { type: 'success', text: '✓ Sandbox ready on NixOS Linux (x86_64)' },
+    { type: 'output', text: '  Runtimes: node 20, python3 3.11, pip3, npm, npx' },
     { type: 'output', text: '  Type "help" for commands or "git clone <url>"' },
     { type: 'output', text: '' },
   ]);
@@ -370,6 +371,22 @@ export default function ProjectWorkspace() {
   };
 
   useEffect(() => { if (files.length) localStorage.setItem(`nexios_files_${id}`, JSON.stringify(files)); }, [files, id]);
+
+  // ── Sync real file count back to the projects list ──
+  useEffect(() => {
+    if (!id) return;
+    const saved = localStorage.getItem('nexios_projects');
+    if (!saved) return;
+    try {
+      const list = JSON.parse(saved);
+      const realCount = getAllFilePaths(files).length;
+      const updated = list.map((p: { id: string; files: number; lastModified: string }) =>
+        p.id === id ? { ...p, files: realCount, lastModified: 'just now' } : p
+      );
+      localStorage.setItem('nexios_projects', JSON.stringify(updated));
+    } catch { /* ignore */ }
+  }, [files, id]);
+
   useEffect(() => { localStorage.setItem(`nexios_chat_${id}`, JSON.stringify(messages)); }, [messages, id]);
   useEffect(() => { if (docContent) localStorage.setItem(`nexios_doc_${id}`, docContent); }, [docContent, id]);
   useEffect(() => {
@@ -794,7 +811,8 @@ export default function ProjectWorkspace() {
     const args = parts.slice(1).map((a: string) => a.replace(/^['"]|['"]$/g, ''));
 
     // ── Real shell commands — route to sandbox API ──
-    const REAL_PREFIXES = ['npm', 'npx', 'node', 'python3', 'python', 'pip3', 'pip', 'yarn', 'pnpm', 'deno', 'bun'];
+    // apt/apt-get are included so the API can intercept them and show a NixOS-correct response
+    const REAL_PREFIXES = ['npm', 'npx', 'node', 'python3', 'python', 'pip3', 'pip', 'yarn', 'pnpm', 'deno', 'bun', 'apt', 'apt-get'];
     if (REAL_PREFIXES.includes(command)) {
       setTermLoading(true);
       setTermLines(p => [...p, { type: 'output', text: `⚡ Sandbox executing: ${cmd}` }]);
@@ -872,10 +890,26 @@ export default function ProjectWorkspace() {
     } else if (command === 'git') {
       setTermLines(p => [...p, { type: 'output', text: 'git: supported commands: clone <url>' }]);
     } else if (command === 'which') {
-      const tools: Record<string, string> = { node: '/usr/bin/node', npm: '/usr/bin/npm', python3: '/usr/bin/python3', python: '/usr/bin/python3', pip3: '/usr/bin/pip3' };
+      const tools: Record<string, string> = {
+        node: '/nix/store/.../nodejs-20/bin/node',
+        npm: '/nix/store/.../nodejs-20/bin/npm',
+        python3: '/nix/store/.../python3-3.11/bin/python3',
+        python: '/nix/store/.../python3-3.11/bin/python3',
+        pip3: '/nix/store/.../python3-3.11/bin/pip3',
+        npx: '/nix/store/.../npx/bin/npx',
+      };
       setTermLines(p => [...p, { type: 'output', text: tools[args[0]] || `${args[0]}: not found` }]);
     } else if (command === 'uname') {
-      setTermLines(p => [...p, { type: 'output', text: 'Linux nexios-sandbox 6.1.0 #1 SMP x86_64 GNU/Linux' }]);
+      const flag = args[0] || '';
+      if (flag === '-a' || flag === '--all') {
+        setTermLines(p => [...p, { type: 'output', text: 'Linux nexios-sandbox 6.1.0-nixos #1 SMP NixOS x86_64 GNU/Linux' }]);
+      } else if (flag === '-s') {
+        setTermLines(p => [...p, { type: 'output', text: 'Linux' }]);
+      } else if (flag === '-r') {
+        setTermLines(p => [...p, { type: 'output', text: '6.1.0-nixos' }]);
+      } else {
+        setTermLines(p => [...p, { type: 'output', text: 'Linux' }]);
+      }
     } else if (command === 'whoami') {
       setTermLines(p => [...p, { type: 'output', text: 'nexios' }]);
     } else if (command === 'date') {
