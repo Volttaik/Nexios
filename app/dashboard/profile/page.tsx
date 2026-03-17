@@ -11,7 +11,7 @@ export default function ProfilePage() {
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const profileInputRef = useRef<HTMLInputElement>(null);
-  const { activeProvider, settings } = useAI();
+  const { activeProvider } = useAI();
 
   useEffect(() => {
     setMounted(true);
