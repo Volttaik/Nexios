@@ -15,7 +15,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<AppUser | null>(null);
   const subdomain = useSubdomain();
 
-  // Project workspace gets its own full-screen layout — match /dashboard/projects/[any-id]
   const isWorkspace = /\/dashboard\/projects\/[^/]+/.test(pathname || '');
 
   useEffect(() => {
@@ -52,9 +51,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         isMobileOpen={isMobileMenuOpen}
         onMobileClose={() => setIsMobileMenuOpen(false)}
       />
-      <div className={`transition-all duration-300 ${isSidebarOpen ? 'md:ml-60' : 'md:ml-[72px]'}`}>
+      <div className={`transition-all duration-300 ${isSidebarOpen ? 'md:ml-60' : 'md:ml-0'}`}>
         <DashboardHeader
-          toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          toggleSidebar={() => setIsSidebarOpen(prev => !prev)}
           isSidebarOpen={isSidebarOpen}
           user={user}
           onLogout={handleLogout}
