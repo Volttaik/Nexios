@@ -312,10 +312,10 @@ export default function ChatPage() {
                       </div>
                     )}
                     <div className={`flex items-center gap-1.5 mt-1.5 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
-                      <span className="text-[10px]" style={{ color: 'var(--text3)' }}>{formatTime(msg.timestamp)}</span>
+                      <span className="text-[10px]" style={{ color: 'var(--text3)' }}>{formatTime(msg.timestamp ?? new Date())}</span>
                       {msg.sender === 'ai' && (
                         <>
-                          <button onClick={() => copyText(msg.text, msg.id)} title="Copy"
+                          <button onClick={() => copyText(msg.text, msg.id ?? '')} title="Copy"
                             className="p-1 rounded-lg transition-colors"
                             style={{ color: 'var(--text3)' }}
                             onMouseEnter={e => (e.currentTarget.style.color = 'var(--text)')}
