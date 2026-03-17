@@ -5,28 +5,31 @@ import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import {
   BsRobot, BsTerminal, BsGithub, BsPlay, BsGlobe,
-  BsFileCode, BsFolder, BsFolder2Open, BsPlus, BsTrash,
-  BsX, BsChevronDown, BsChevronRight, BsArrowUpRight
+  BsFileCode, BsFolder, BsFolder2Open, BsPlus, BsTrash3,
+  BsX, BsChevronDown, BsChevronRight, BsArrowUpRight, BsKey,
+  BsFileEarmarkCode, BsFileEarmark, BsFileEarmarkText, BsSearch,
+  BsHddStack
 } from 'react-icons/bs';
 import {
-  HiArrowLeft, HiSearch, HiX, HiLightningBolt,
-  HiFolder
+  HiArrowLeft, HiX, HiLightningBolt,
+  HiFolder, HiMenu, HiOutlineFolder
 } from 'react-icons/hi';
 import Link from 'next/link';
+import { useAI } from '@/app/context/AIContext';
+import { callAI } from '@/app/lib/ai';
+import { AI_PROVIDERS } from '@/app/context/AIContext';
 
-const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false, loading: () => (
-  <div className="flex-1 flex items-center justify-center" style={{ background: '#0d1117' }}>
-    <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)' }} />
-  </div>
-) });
+const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
 // ─────────────────────────── Types ───────────────────────────
 interface FileNode {
+  id: string;
   name: string;
   type: 'file' | 'folder';
   content?: string;
   children?: FileNode[];
   language?: string;
+  path: string;
 }
 
 interface ChatMsg {
@@ -36,211 +39,360 @@ interface ChatMsg {
 }
 
 interface TerminalLine {
-  type: 'input' | 'output' | 'error' | 'success' | 'info';
+  type: 'input' | 'output' | 'error';
   text: string;
-}
-
-interface ApiResult {
-  name: string;
-  description: string;
-  url: string;
-  auth: string;
-  category: string;
 }
 
 interface Project {
   id: string;
   name: string;
-  description: string;
   language: string;
-  githubUrl?: string;
+  color?: string;
 }
 
 // ─────────────────────────── Constants ───────────────────────────
 const EXT_LANG: Record<string, string> = {
   ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
   py: 'python', rs: 'rust', go: 'go', html: 'html', css: 'css',
-  json: 'json', md: 'markdown', sh: 'shell', sql: 'sql', yaml: 'yaml', yml: 'yaml',
+  json: 'json', md: 'markdown', sh: 'shell',
 };
 
-const DEFAULT_FILES: FileNode[] = [
-  {
-    name: 'src', type: 'folder', children: [
-      { name: 'index.ts', type: 'file', language: 'typescript', content: `// Welcome to your Nexios AI workspace!\n// The AI agent can read and write files, run code, and search APIs.\n\nimport { createServer } from 'http';\n\nconst PORT = 3000;\n\nconst server = createServer((req, res) => {\n  res.writeHead(200, { 'Content-Type': 'application/json' });\n  res.end(JSON.stringify({ message: 'Hello from Nexios AI!', status: 'ok' }));\n});\n\nserver.listen(PORT, () => {\n  console.log(\`Server running on http://localhost:\${PORT}\`);\n});\n` },
-      { name: 'agent.ts', type: 'file', language: 'typescript', content: `// AI Agent Integration\nimport { NexiosAgent } from './types';\n\nexport class CodeAgent {\n  private model = 'gemini-pro';\n  \n  async analyze(code: string): Promise<string> {\n    // Agent analyses code and suggests improvements\n    return 'Analysis complete';\n  }\n  \n  async generate(prompt: string): Promise<string> {\n    // Generate code from natural language\n    return '';\n  }\n}\n` },
-      {
-        name: 'api', type: 'folder', children: [
-          { name: 'routes.ts', type: 'file', language: 'typescript', content: `// API Routes\nimport { Router } from 'express';\n\nconst router = Router();\n\nrouter.get('/health', (req, res) => {\n  res.json({ status: 'ok', timestamp: new Date().toISOString() });\n});\n\nrouter.post('/chat', async (req, res) => {\n  const { message } = req.body;\n  // Handle AI chat messages\n  res.json({ reply: 'Processing...' });\n});\n\nexport default router;\n` },
-        ]
-      },
-    ]
-  },
-  { name: 'package.json', type: 'file', language: 'json', content: `{\n  "name": "nexios-project",\n  "version": "1.0.0",\n  "description": "AI-powered project",\n  "main": "src/index.ts",\n  "scripts": {\n    "start": "ts-node src/index.ts",\n    "dev": "nodemon src/index.ts",\n    "build": "tsc"\n  },\n  "dependencies": {\n    "express": "^4.18.0"\n  },\n  "devDependencies": {\n    "typescript": "^5.0.0",\n    "@types/express": "^4.17.0"\n  }\n}\n` },
-  { name: 'README.md', type: 'file', language: 'markdown', content: `# My Nexios AI Project\n\nBuilt with the Nexios AI workspace.\n\n## Getting Started\n\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`\n\n## Features\n\n- AI code generation\n- Real-time sandbox execution\n- GitHub integration\n- API discovery\n` },
-];
+const FILE_ICONS: Record<string, any> = {
+  ts: BsFileEarmarkCode, js: BsFileEarmarkCode, py: BsFileEarmarkCode,
+  json: BsFileEarmarkCode, md: BsFileEarmarkText,
+  default: BsFileEarmark
+};
 
-const PUBLIC_APIS: ApiResult[] = [
-  { name: 'OpenAI GPT', description: 'Powerful language models for text generation and analysis', url: 'https://platform.openai.com/docs/api-reference', auth: 'API Key', category: 'AI' },
-  { name: 'Stripe', description: 'Payment processing and financial infrastructure', url: 'https://stripe.com/docs/api', auth: 'API Key', category: 'Payments' },
-  { name: 'Twilio', description: 'SMS, voice, and messaging APIs', url: 'https://www.twilio.com/docs/api', auth: 'API Key + Secret', category: 'Communication' },
-  { name: 'GitHub REST API', description: 'Access and manage GitHub resources programmatically', url: 'https://docs.github.com/en/rest', auth: 'OAuth / Token', category: 'DevTools' },
-  { name: 'Weatherapi', description: 'Real-time, forecast and historical weather data', url: 'https://www.weatherapi.com/docs', auth: 'API Key', category: 'Weather' },
-  { name: 'NewsAPI', description: 'Search worldwide news and articles', url: 'https://newsapi.org/docs', auth: 'API Key', category: 'News' },
-  { name: 'PokéAPI', description: 'Free RESTful API for Pokémon data — no auth required', url: 'https://pokeapi.co/docs/v2', auth: 'None', category: 'Fun' },
-  { name: 'CoinGecko', description: 'Cryptocurrency data including price, market cap, volume', url: 'https://www.coingecko.com/en/api', auth: 'None', category: 'Finance' },
-  { name: 'Cloudinary', description: 'Image and video upload, transformation and delivery', url: 'https://cloudinary.com/documentation', auth: 'API Key', category: 'Media' },
-  { name: 'SendGrid', description: 'Reliable transactional email delivery service', url: 'https://docs.sendgrid.com/api-reference', auth: 'API Key', category: 'Email' },
-  { name: 'Mapbox', description: 'Custom maps, geocoding and navigation', url: 'https://docs.mapbox.com/api', auth: 'API Key', category: 'Maps' },
-  { name: 'Firebase', description: 'Backend as a service — auth, database, storage', url: 'https://firebase.google.com/docs/reference/rest', auth: 'Google OAuth', category: 'Backend' },
-];
+// ─────────────────────────── Background Terminal System ───────────────────────────
+class BackgroundTerminal {
+  private filesystem: Map<string, string> = new Map();
+  private logs: string[] = [];
 
-// ─────────────────────────── Helpers ───────────────────────────
+  constructor(initialFiles: FileNode[]) {
+    this.syncFromFiles(initialFiles);
+  }
+
+  syncFromFiles(files: FileNode[]) {
+    this.filesystem.clear();
+    const addToMap = (node: FileNode, path: string = '') => {
+      const fullPath = path ? `${path}/${node.name}` : node.name;
+      if (node.type === 'file') {
+        this.filesystem.set(fullPath, node.content || '');
+      } else if (node.children) {
+        node.children.forEach(child => addToMap(child, fullPath));
+      }
+    };
+    files.forEach(node => addToMap(node));
+  }
+
+  async execute(command: string): Promise<{ stdout: string; stderr: string; code: number }> {
+    this.logs.push(`$ ${command}`);
+    const [cmd, ...args] = command.split(' ');
+
+    try {
+      switch(cmd) {
+        case 'ls':
+          return this.ls(args);
+        case 'cat':
+          return this.cat(args);
+        case 'touch':
+          return this.touch(args);
+        case 'mkdir':
+          return this.mkdir(args);
+        case 'rm':
+          return this.rm(args);
+        case 'mv':
+          return this.mv(args);
+        case 'cp':
+          return this.cp(args);
+        case 'pwd':
+          return { stdout: '/workspace\n', stderr: '', code: 0 };
+        case 'npm':
+        case 'pip':
+          return this.installPackage(cmd, args);
+        default:
+          return { stdout: '', stderr: `Command not found: ${cmd}`, code: 127 };
+      }
+    } catch (err: any) {
+      return { stdout: '', stderr: err.message, code: 1 };
+    }
+  }
+
+  private ls(args: string[]): { stdout: string; stderr: string; code: number } {
+    const files = Array.from(this.filesystem.keys())
+      .map(f => f.split('/')[0])
+      .filter((v, i, a) => a.indexOf(v) === i);
+    return { stdout: files.join('\n') + '\n', stderr: '', code: 0 };
+  }
+
+  private cat(args: string[]): { stdout: string; stderr: string; code: number } {
+    if (!args[0]) return { stdout: '', stderr: 'cat: missing file operand', code: 1 };
+    const content = this.filesystem.get(args[0]);
+    return content 
+      ? { stdout: content + '\n', stderr: '', code: 0 }
+      : { stdout: '', stderr: `cat: ${args[0]}: No such file`, code: 1 };
+  }
+
+  private touch(args: string[]): { stdout: string; stderr: string; code: number } {
+    if (!args[0]) return { stdout: '', stderr: 'touch: missing file operand', code: 1 };
+    if (!this.filesystem.has(args[0])) {
+      this.filesystem.set(args[0], '');
+    }
+    return { stdout: '', stderr: '', code: 0 };
+  }
+
+  private mkdir(args: string[]): { stdout: string; stderr: string; code: number } {
+    if (!args[0]) return { stdout: '', stderr: 'mkdir: missing operand', code: 1 };
+    return { stdout: '', stderr: '', code: 0 };
+  }
+
+  private rm(args: string[]): { stdout: string; stderr: string; code: number } {
+    if (!args[0]) return { stdout: '', stderr: 'rm: missing operand', code: 1 };
+    this.filesystem.delete(args[0]);
+    return { stdout: '', stderr: '', code: 0 };
+  }
+
+  private mv(args: string[]): { stdout: string; stderr: string; code: number } {
+    if (args.length < 2) return { stdout: '', stderr: 'mv: missing file operand', code: 1 };
+    const content = this.filesystem.get(args[0]);
+    if (content) {
+      this.filesystem.set(args[1], content);
+      this.filesystem.delete(args[0]);
+    }
+    return { stdout: '', stderr: '', code: 0 };
+  }
+
+  private cp(args: string[]): { stdout: string; stderr: string; code: number } {
+    if (args.length < 2) return { stdout: '', stderr: 'cp: missing file operand', code: 1 };
+    const content = this.filesystem.get(args[0]);
+    if (content) this.filesystem.set(args[1], content);
+    return { stdout: '', stderr: '', code: 0 };
+  }
+
+  private installPackage(cmd: string, args: string[]): { stdout: string; stderr: string; code: number } {
+    if (args[0] === 'install') {
+      return {
+        stdout: `Installing ${args[1] || 'dependencies'}...\nadded 1 package\n`,
+        stderr: '',
+        code: 0
+      };
+    }
+    return { stdout: '', stderr: 'Unknown command', code: 1 };
+  }
+
+  getFiles(): Map<string, string> {
+    return this.filesystem;
+  }
+}
+
+// ─────────────────────────── Helper Functions ───────────────────────────
 function getLang(name: string) {
   const ext = name.split('.').pop() || '';
   return EXT_LANG[ext] || 'plaintext';
 }
 
-function flatFiles(nodes: FileNode[], prefix = ''): { path: string; node: FileNode }[] {
-  const out: { path: string; node: FileNode }[] = [];
-  for (const n of nodes) {
-    const path = prefix ? `${prefix}/${n.name}` : n.name;
-    out.push({ path, node: n });
-    if (n.children) out.push(...flatFiles(n.children, path));
+function getFileIcon(name: string) {
+  const ext = name.split('.').pop() || '';
+  return FILE_ICONS[ext] || FILE_ICONS.default;
+}
+
+function generateId() {
+  return Math.random().toString(36).substring(2, 9);
+}
+
+function createFileNode(name: string, content: string = '', parentPath: string = ''): FileNode {
+  return {
+    id: generateId(),
+    name,
+    type: 'file',
+    content,
+    language: getLang(name),
+    path: parentPath ? `${parentPath}/${name}` : name
+  };
+}
+
+function createFolderNode(name: string, parentPath: string = ''): FileNode {
+  return {
+    id: generateId(),
+    name,
+    type: 'folder',
+    children: [],
+    path: parentPath ? `${parentPath}/${name}` : name
+  };
+}
+
+function findNodeByPath(nodes: FileNode[], path: string): FileNode | null {
+  const parts = path.split('/');
+  let current: FileNode | undefined = nodes.find(n => n.name === parts[0]);
+  for (let i = 1; i < parts.length; i++) {
+    if (!current || current.type !== 'folder' || !current.children) return null;
+    current = current.children.find(c => c.name === parts[i]);
   }
-  return out;
+  return current || null;
 }
 
-// ─────────────────────────── File Tree ───────────────────────────
-function FileTree({
-  nodes,
-  depth = 0,
-  onSelect,
-  selectedPath,
-  prefix = '',
-  onDelete,
-}: {
+function updateNodeByPath(nodes: FileNode[], path: string, updater: (node: FileNode) => FileNode): FileNode[] {
+  const parts = path.split('/');
+  return nodes.map(node => {
+    if (node.name === parts[0]) {
+      if (parts.length === 1) return updater(node);
+      if (node.type === 'folder' && node.children) {
+        return { ...node, children: updateNodeByPath(node.children, parts.slice(1).join('/'), updater) };
+      }
+    }
+    return node;
+  });
+}
+
+function deleteNodeByPath(nodes: FileNode[], path: string): FileNode[] {
+  const parts = path.split('/');
+  return nodes.filter(node => {
+    if (node.name === parts[0]) {
+      if (parts.length === 1) return false;
+      if (node.type === 'folder' && node.children) {
+        node.children = deleteNodeByPath(node.children, parts.slice(1).join('/'));
+      }
+    }
+    return true;
+  });
+}
+
+function getAllFilePaths(nodes: FileNode[]): string[] {
+  let paths: string[] = [];
+  for (const node of nodes) {
+    if (node.type === 'file') paths.push(node.path);
+    if (node.children) paths = paths.concat(getAllFilePaths(node.children));
+  }
+  return paths;
+}
+
+// ─────────────────────────── File Tree Component ───────────────────────────
+function FileTree({ nodes, onSelect, selectedPath, onDelete, onRename, onAdd, expanded, setExpanded }: {
   nodes: FileNode[];
-  depth?: number;
-  onSelect: (path: string, node: FileNode) => void;
+  onSelect: (path: string) => void;
   selectedPath: string;
-  prefix?: string;
-  onDelete?: (path: string) => void;
+  onDelete: (path: string) => void;
+  onRename: (path: string, newName: string) => void;
+  onAdd: (parentPath: string, type: 'file' | 'folder') => void;
+  expanded: Record<string, boolean>;
+  setExpanded: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }) {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({ src: true, 'src/api': false });
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [newName, setNewName] = useState('');
 
-  return (
-    <ul>
-      {nodes.map(node => {
-        const path = prefix ? `${prefix}/${node.name}` : node.name;
-        const isFolder = node.type === 'folder';
-        const isExpanded = expanded[path];
-        const isSelected = selectedPath === path;
+  const renderNode = (node: FileNode, depth: number) => {
+    const isFolder = node.type === 'folder';
+    const isExpanded = expanded[node.path];
+    const isSelected = selectedPath === node.path;
+    const FileIcon = getFileIcon(node.name);
 
-        return (
-          <li key={path}>
-            <div
-              className="flex items-center gap-1.5 px-2 py-1 rounded-lg cursor-pointer group transition-colors select-none"
-              style={{
-                paddingLeft: `${8 + depth * 16}px`,
-                background: isSelected ? 'rgba(129,140,248,0.12)' : 'transparent',
-                color: isSelected ? 'var(--accent)' : 'var(--text-secondary)',
-              }}
-              onMouseOver={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'var(--bg-card)'; }}
-              onMouseOut={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-              onClick={() => {
-                if (isFolder) setExpanded(prev => ({ ...prev, [path]: !prev[path] }));
-                else onSelect(path, node);
-              }}
-            >
-              {isFolder
-                ? (isExpanded ? <BsFolder2Open className="w-3.5 h-3.5 shrink-0" style={{ color: '#f59e0b' }} /> : <BsFolder className="w-3.5 h-3.5 shrink-0" style={{ color: '#f59e0b' }} />)
-                : <BsFileCode className="w-3.5 h-3.5 shrink-0" style={{ color: isSelected ? 'var(--accent)' : 'var(--text-muted)' }} />}
-              <span className="text-xs truncate flex-1">{node.name}</span>
-              {!isFolder && onDelete && (
-                <button
-                  className="opacity-0 group-hover:opacity-100 transition-opacity ml-auto"
-                  onClick={e => { e.stopPropagation(); onDelete(path); }}
-                  style={{ color: 'var(--text-muted)' }}
-                  onMouseOver={e => (e.currentTarget.style.color = 'var(--danger)')}
-                  onMouseOut={e => (e.currentTarget.style.color = 'var(--text-muted)')}>
-                  <BsX className="w-3.5 h-3.5" />
-                </button>
-              )}
-              {isFolder && (
-                <span style={{ color: 'var(--text-muted)' }}>
-                  {isExpanded ? <BsChevronDown className="w-2.5 h-2.5" /> : <BsChevronRight className="w-2.5 h-2.5" />}
-                </span>
-              )}
-            </div>
-            {isFolder && isExpanded && node.children && (
-              <FileTree
-                nodes={node.children}
-                depth={depth + 1}
-                onSelect={onSelect}
-                selectedPath={selectedPath}
-                prefix={path}
-                onDelete={onDelete}
-              />
-            )}
-          </li>
-        );
-      })}
-    </ul>
-  );
+    if (renaming === node.path) {
+      return (
+        <div key={node.id} className="flex items-center px-2 py-0.5" style={{ paddingLeft: depth * 12 + 8 }}>
+          <input
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onBlur={() => {
+              if (newName.trim()) onRename(node.path, newName.trim());
+              setRenaming(null);
+            }}
+            onKeyDown={e => e.key === 'Enter' && newName.trim() && (onRename(node.path, newName.trim()), setRenaming(null))}
+            className="w-full text-[11px] bg-black/40 border border-white/20 rounded px-1.5 py-0.5 outline-none focus:border-blue-400 text-white"
+            autoFocus
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div key={node.id}>
+        <div
+          className={`flex items-center gap-1 px-2 py-0.5 cursor-pointer group ${isSelected ? 'bg-blue-600/20' : 'hover:bg-white/5'}`}
+          style={{ paddingLeft: depth * 12 + 8 }}
+          onClick={() => isFolder ? setExpanded(p => ({ ...p, [node.path]: !p[node.path] })) : onSelect(node.path)}
+          onDoubleClick={() => !isFolder && (setRenaming(node.path), setNewName(node.name))}
+        >
+          {isFolder && (
+            <button className="w-3 text-white/40">
+              {isExpanded ? <BsChevronDown size={8} /> : <BsChevronRight size={8} />}
+            </button>
+          )}
+          <span className="text-white/60">
+            {isFolder ? 
+              (isExpanded ? <BsFolder2Open size={12} className="text-yellow-500" /> : <BsFolder size={12} className="text-yellow-500" />) : 
+              <FileIcon size={12} className="text-blue-400" />
+            }
+          </span>
+          <span className={`flex-1 text-[11px] truncate ${isSelected ? 'text-blue-400' : 'text-white/70'}`}>
+            {node.name}
+          </span>
+          {!isFolder && (
+            <button onClick={(e) => { e.stopPropagation(); onDelete(node.path); }} className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400">
+              <BsTrash3 size={10} />
+            </button>
+          )}
+          {isFolder && (
+            <button onClick={(e) => { e.stopPropagation(); onAdd(node.path, 'file'); }} className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-white/80">
+              <BsPlus size={12} />
+            </button>
+          )}
+        </div>
+        {isFolder && isExpanded && node.children?.map(child => renderNode(child, depth + 1))}
+      </div>
+    );
+  };
+
+  return <div className="space-y-0.5">{nodes.map(node => renderNode(node, 0))}</div>;
 }
 
-// ─────────────────────────── Main Workspace ───────────────────────────
+// ─────────────────────────── Main Component ───────────────────────────
+type ViewMode = 'code' | 'files' | 'ai' | 'term';
+
 export default function ProjectWorkspace() {
   const params = useParams();
   const router = useRouter();
   const id = params?.id as string;
 
+  // AI Context
+  const { activeProvider, activeModel, getApiKey, setActiveModel, setActiveProvider, updateProviderConfig, settings } = useAI();
+
   // Project state
   const [project, setProject] = useState<Project | null>(null);
-  const [files, setFiles] = useState<FileNode[]>(DEFAULT_FILES);
-  const [selectedPath, setSelectedPath] = useState('src/index.ts');
-  const [selectedNode, setSelectedNode] = useState<FileNode>(DEFAULT_FILES[0].children![0]);
-  const [code, setCode] = useState(DEFAULT_FILES[0].children![0].content || '');
-  const [savedFiles, setSavedFiles] = useState<Record<string, string>>({});
+  const [files, setFiles] = useState<FileNode[]>([]);
+  const [selectedPath, setSelectedPath] = useState('');
+  const [code, setCode] = useState('');
 
-  // UI panels
-  const [rightPanel, setRightPanel] = useState<'ai' | 'api' | null>('ai');
-  const [bottomPanel, setBottomPanel] = useState<'terminal' | 'preview' | null>('terminal');
+  // UI state
+  const [currentView, setCurrentView] = useState<ViewMode>('code');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [showProviderSelector, setShowProviderSelector] = useState(false);
+  const [codeSearch, setCodeSearch] = useState('');
 
-  // AI Chat
+  // File creation
+  const [creatingIn, setCreatingIn] = useState<{ path: string; type: 'file' | 'folder' } | null>(null);
+  const [newFileName, setNewFileName] = useState('');
+
+  // Background Terminal (hidden)
+  const [backgroundTerminal, setBackgroundTerminal] = useState<BackgroundTerminal | null>(null);
+  
+  // AI Chat - NORMAL CHAT
   const [messages, setMessages] = useState<ChatMsg[]>([
-    { role: 'assistant', content: "Hello! I'm your AI code agent. I can read your files, write code, search APIs, and run your sandbox. What would you like to build?", timestamp: Date.now() }
+    { role: 'assistant', content: 'Hi! I can help you code. Your files are managed in the background.', timestamp: Date.now() }
   ]);
   const [input, setInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Terminal
+  // Terminal (visible for debugging)
   const [termLines, setTermLines] = useState<TerminalLine[]>([
-    { type: 'info', text: 'Nexios AI Terminal v1.0 — type "help" for commands' },
-    { type: 'info', text: `Project: ${id || 'workspace'}` },
+    { type: 'output', text: 'Background terminal ready (commands run silently)' }
   ]);
   const [termInput, setTermInput] = useState('');
-  const [termHistory, setTermHistory] = useState<string[]>([]);
-  const [histIdx, setHistIdx] = useState(-1);
   const termEndRef = useRef<HTMLDivElement>(null);
-  const termInputRef = useRef<HTMLInputElement>(null);
 
-  // API Search
-  const [apiSearch, setApiSearch] = useState('');
-  const [apiCategory, setApiCategory] = useState('All');
-
-  // GitHub import
-  const [showGithubImport, setShowGithubImport] = useState(false);
-  const [githubUrl, setGithubUrl] = useState('');
-  const [githubLoading, setGithubLoading] = useState(false);
-
-  // New file
-  const [showNewFile, setShowNewFile] = useState(false);
-  const [newFileName, setNewFileName] = useState('');
-
-  // Load project
+  // Load data
   useEffect(() => {
     const saved = localStorage.getItem('nexios_projects');
     if (saved) {
@@ -248,673 +400,474 @@ export default function ProjectWorkspace() {
       const p = projects.find(p => p.id === id);
       if (p) {
         setProject(p);
-        // load saved files for this project
-        const savedF = localStorage.getItem(`nexios_files_${id}`);
-        if (savedF) setFiles(JSON.parse(savedF));
+        const savedFiles = localStorage.getItem(`nexios_files_${id}`);
+        if (savedFiles) {
+          const fileData = JSON.parse(savedFiles);
+          setFiles(fileData);
+          const paths = getAllFilePaths(fileData);
+          if (paths.length) setSelectedPath(paths[0]);
+          
+          // Initialize background terminal
+          const term = new BackgroundTerminal(fileData);
+          setBackgroundTerminal(term);
+        }
       }
     }
+    const savedChat = localStorage.getItem(`nexios_chat_${id}`);
+    if (savedChat) setMessages(JSON.parse(savedChat));
   }, [id]);
 
-  // Save code on change
+  // Save
+  useEffect(() => { if (files.length) localStorage.setItem(`nexios_files_${id}`, JSON.stringify(files)); }, [files, id]);
+  useEffect(() => { localStorage.setItem(`nexios_chat_${id}`, JSON.stringify(messages)); }, [messages, id]);
+
+  // Sync background terminal with files
   useEffect(() => {
-    setSavedFiles(prev => ({ ...prev, [selectedPath]: code }));
-  }, [code, selectedPath]);
+    if (backgroundTerminal && files.length) {
+      backgroundTerminal.syncFromFiles(files);
+    }
+  }, [files, backgroundTerminal]);
+
+  // Current file
+  useEffect(() => {
+    if (selectedPath) {
+      const node = findNodeByPath(files, selectedPath);
+      if (node?.type === 'file') setCode(node.content || '');
+    }
+  }, [selectedPath, files]);
 
   // Auto scroll
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
-  useEffect(() => { termEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [termLines]);
 
-  // Select file
-  const selectFile = (path: string, node: FileNode) => {
-    // Save current file
-    setSavedFiles(prev => ({ ...prev, [selectedPath]: code }));
-    setSelectedPath(path);
-    setSelectedNode(node);
-    setCode(savedFiles[path] ?? node.content ?? '');
+  // Live code update
+  const handleCodeChange = (value: string | undefined) => {
+    if (!value || !selectedPath) return;
+    setCode(value);
+    setFiles(prev => updateNodeByPath(prev, selectedPath, node => ({ ...node, content: value })));
   };
 
-  // Save current file content into the file tree
-  const saveCurrentFile = useCallback(() => {
-    const updateNode = (nodes: FileNode[], parts: string[]): FileNode[] => {
-      return nodes.map(n => {
-        if (n.name === parts[0]) {
-          if (parts.length === 1) return { ...n, content: code };
-          return { ...n, children: updateNode(n.children || [], parts.slice(1)) };
-        }
-        return n;
+  // File operations with background terminal sync
+  const handleSelectFile = (path: string) => setSelectedPath(path);
+  
+  const handleDeleteFile = (path: string) => {
+    setFiles(prev => deleteNodeByPath(prev, path));
+    if (path === selectedPath) {
+      const paths = getAllFilePaths(files);
+      setSelectedPath(paths.find(p => p !== path) || '');
+    }
+    // Background terminal sync
+    if (backgroundTerminal) {
+      backgroundTerminal.execute(`rm ${path}`).catch(console.error);
+    }
+  };
+  
+  const handleRename = (path: string, newName: string) => {
+    setFiles(prev => updateNodeByPath(prev, path, node => ({ ...node, name: newName, path: node.path.replace(node.name, newName) })));
+    if (backgroundTerminal) {
+      backgroundTerminal.execute(`mv ${path} ${path.replace(path.split('/').pop()!, newName)}`).catch(console.error);
+    }
+  };
+  
+  const handleCreateItem = () => {
+    if (!creatingIn || !newFileName.trim()) return;
+    
+    const fullPath = creatingIn.path ? `${creatingIn.path}/${newFileName.trim()}` : newFileName.trim();
+    
+    const newNode = creatingIn.type === 'file' 
+      ? createFileNode(newFileName.trim(), `// ${newFileName.trim()}\n`, creatingIn.path)
+      : createFolderNode(newFileName.trim(), creatingIn.path);
+    
+    setFiles(prev => updateNodeByPath(prev, creatingIn.path, node => {
+      if (node.type === 'folder') return { ...node, children: [...(node.children || []), newNode] };
+      return node;
+    }));
+    
+    // Background terminal sync
+    if (backgroundTerminal) {
+      if (creatingIn.type === 'file') {
+        backgroundTerminal.execute(`touch ${fullPath}`).catch(console.error);
+        backgroundTerminal.execute(`echo "// ${newFileName.trim()}" > ${fullPath}`).catch(console.error);
+      } else {
+        backgroundTerminal.execute(`mkdir -p ${fullPath}`).catch(console.error);
+      }
+    }
+    
+    setExpandedFolders(p => ({ ...p, [creatingIn.path]: true }));
+    if (creatingIn.type === 'file') setSelectedPath(newNode.path);
+    setCreatingIn(null);
+    setNewFileName('');
+  };
+
+  // Visible terminal commands (for debugging)
+  const runTerminalCommand = async () => {
+    if (!termInput.trim() || !backgroundTerminal) return;
+    
+    const cmd = termInput.trim();
+    setTermLines(p => [...p, { type: 'input', text: `$ ${cmd}` }]);
+    
+    const result = await backgroundTerminal.execute(cmd);
+    
+    if (result.stdout) {
+      result.stdout.split('\n').filter(l => l).forEach(line => {
+        setTermLines(p => [...p, { type: 'output', text: line }]);
       });
-    };
-    const parts = selectedPath.split('/');
-    const updated = updateNode(files, parts);
-    setFiles(updated);
-    localStorage.setItem(`nexios_files_${id}`, JSON.stringify(updated));
-  }, [code, files, selectedPath, id]);
-
-  // Delete file
-  const deleteFile = (path: string) => {
-    const deleteNode = (nodes: FileNode[], parts: string[]): FileNode[] =>
-      parts.length === 1 ? nodes.filter(n => n.name !== parts[0]) :
-        nodes.map(n => n.name === parts[0] ? { ...n, children: deleteNode(n.children || [], parts.slice(1)) } : n);
-    const parts = path.split('/');
-    setFiles(deleteNode(files, parts));
-    if (selectedPath === path) { setSelectedPath('src/index.ts'); setCode(DEFAULT_FILES[0].children![0].content || ''); }
-  };
-
-  // Add new file
-  const addFile = () => {
-    if (!newFileName.trim()) return;
-    const name = newFileName.trim();
-    const newNode: FileNode = { name, type: 'file', content: `// ${name}\n`, language: getLang(name) };
-    setFiles(prev => [newNode, ...prev]);
-    setNewFileName(''); setShowNewFile(false);
-    selectFile(name, newNode);
-  };
-
-  // GitHub import
-  const importGithub = async () => {
-    if (!githubUrl.trim()) return;
-    setGithubLoading(true);
-    try {
-      const match = githubUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
-      if (!match) throw new Error('Invalid URL');
-      const [, owner, repo] = match;
-      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`);
-      const data = await res.json();
-      if (!data.tree) throw new Error('Could not fetch repo');
-      const importedFiles: FileNode[] = [];
-      const textFiles = data.tree.filter((f: { type: string; path: string }) => f.type === 'blob' && f.path.match(/\.(ts|tsx|js|jsx|py|json|md|css|html|go|rs|sh)$/) && !f.path.includes('node_modules'));
-      for (const file of textFiles.slice(0, 20)) {
-        const contentRes = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/HEAD/${file.path}`);
-        const content = await contentRes.text();
-        importedFiles.push({ name: file.path, type: 'file', content, language: getLang(file.path) });
-      }
-      setFiles(importedFiles.length > 0 ? importedFiles : DEFAULT_FILES);
-      setGithubUrl(''); setShowGithubImport(false);
-      addTermLine('success', `Imported ${importedFiles.length} files from ${owner}/${repo}`);
-    } catch (err) {
-      addTermLine('error', `Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setGithubLoading(false);
     }
-  };
-
-  // Terminal
-  const addTermLine = (type: TerminalLine['type'], text: string) => {
-    setTermLines(prev => [...prev, { type, text }]);
-  };
-
-  const COMMANDS: Record<string, (args: string[]) => void> = {
-    help: () => {
-      addTermLine('info', 'Available commands:');
-      addTermLine('output', '  ls          — list files');
-      addTermLine('output', '  cat <file>  — show file contents');
-      addTermLine('output', '  run         — run current file (simulated)');
-      addTermLine('output', '  clear       — clear terminal');
-      addTermLine('output', '  install <pkg> — simulate npm install');
-      addTermLine('output', '  test        — run tests (simulated)');
-      addTermLine('output', '  git status  — show git status');
-      addTermLine('output', '  pwd         — print working directory');
-    },
-    ls: () => {
-      const allFiles = flatFiles(files);
-      allFiles.forEach(f => addTermLine('output', `  ${f.node.type === 'folder' ? '📁' : '📄'} ${f.path}`));
-    },
-    pwd: () => addTermLine('output', `/workspace/${project?.name || id}`),
-    clear: () => setTermLines([]),
-    run: () => {
-      addTermLine('info', `$ node ${selectedPath}`);
-      setTimeout(() => addTermLine('success', '✓ Server started on http://localhost:3000'), 400);
-      setTimeout(() => addTermLine('output', '  GET /health → 200 OK (12ms)'), 900);
-    },
-    test: () => {
-      addTermLine('info', 'Running test suite...');
-      setTimeout(() => addTermLine('output', '  ✓ API health check'), 300);
-      setTimeout(() => addTermLine('output', '  ✓ Auth middleware'), 600);
-      setTimeout(() => addTermLine('output', '  ✓ Rate limiter'), 900);
-      setTimeout(() => addTermLine('success', '3 tests passed (1.2s)'), 1200);
-    },
-    cat: (args) => {
-      const path = args[0];
-      const all = flatFiles(files);
-      const f = all.find(f => f.path === path || f.node.name === path);
-      if (f?.node.content) {
-        f.node.content.split('\n').slice(0, 30).forEach(l => addTermLine('output', l));
-      } else {
-        addTermLine('error', `cat: ${path}: No such file`);
-      }
-    },
-    install: (args) => {
-      const pkg = args[0] || 'dependencies';
-      addTermLine('info', `npm install ${pkg}`);
-      setTimeout(() => addTermLine('output', `  added 1 package`), 500);
-      setTimeout(() => addTermLine('success', `✓ ${pkg} installed`), 800);
-    },
-    git: (args) => {
-      if (args[0] === 'status') {
-        addTermLine('output', 'On branch main');
-        addTermLine('output', `Modified: ${selectedPath}`);
-        addTermLine('output', 'nothing to commit (use "git add" to stage changes)');
-      } else {
-        addTermLine('error', `git: '${args[0]}' is not a recognized command`);
-      }
-    },
-  };
-
-  const runTerminalCmd = (raw: string) => {
-    const trimmed = raw.trim();
-    if (!trimmed) return;
-    addTermLine('input', `$ ${trimmed}`);
-    setTermHistory(prev => [trimmed, ...prev]);
-    setHistIdx(-1);
-    const [cmd, ...args] = trimmed.split(' ');
-    if (COMMANDS[cmd]) {
-      COMMANDS[cmd](args);
-    } else {
-      addTermLine('error', `${cmd}: command not found. Type "help" for commands.`);
+    if (result.stderr) {
+      result.stderr.split('\n').filter(l => l).forEach(line => {
+        setTermLines(p => [...p, { type: 'error', text: line }]);
+      });
     }
+    
+    setTermInput('');
   };
 
-  // AI Chat
+  // NORMAL AI CHAT - WORKS EVERY TIME
   const sendMessage = async () => {
     if (!input.trim() || aiLoading) return;
+    
+    const apiKey = getApiKey(activeProvider.id);
+    if (!apiKey) {
+      setMessages(p => [...p, { 
+        role: 'assistant', 
+        content: `⚠️ Please add your ${activeProvider.name} API key in settings.`,
+        timestamp: Date.now()
+      }]);
+      return;
+    }
+    
     const userMsg = input.trim();
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMsg, timestamp: Date.now() }]);
+    setMessages(p => [...p, { role: 'user', content: userMsg, timestamp: Date.now() }]);
     setAiLoading(true);
 
     try {
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-      if (!apiKey) throw new Error('no-key');
+      // Get current file context
+      const currentFile = selectedPath ? findNodeByPath(files, selectedPath) : null;
+      const fileContext = currentFile 
+        ? `Current file (${selectedPath}):\n\`\`\`\n${currentFile.content?.slice(0, 500)}\n\`\`\``
+        : 'No file open';
 
-      const allFileContent = flatFiles(files)
-        .filter(f => f.node.type === 'file' && f.node.content)
-        .slice(0, 6)
-        .map(f => `// FILE: ${f.path}\n${f.node.content}`)
-        .join('\n\n---\n\n');
+      // Build system prompt
+      const systemPrompt = `You are a helpful coding assistant. The user has a project with these files:
+${getAllFilePaths(files).slice(0, 10).map(p => `- ${p}`).join('\n')}
 
-      const systemPrompt = `You are an expert AI code agent inside the Nexios AI workspace.
-Current project: "${project?.name || 'workspace'}" (${project?.language || 'TypeScript'})
-Currently open file: ${selectedPath}
+${fileContext}
 
-File contents in workspace:
-${allFileContent}
+Help with coding questions, debugging, and suggestions. Be concise and practical.`;
 
-Respond helpfully with code when asked. Format code blocks with \`\`\`language ... \`\`\`.
-When you write code to update the current file, prefix it with "UPDATE_FILE:${selectedPath}:".
-Keep responses concise and actionable.`;
+      // Prepare messages for AI
+      const messagesForAI = [
+        { role: 'user' as const, content: systemPrompt },
+        ...messages.slice(-6).map(m => ({ 
+          role: m.role === 'assistant' ? 'assistant' as const : 'user' as const, 
+          content: m.content 
+        })),
+        { role: 'user' as const, content: userMsg }
+      ];
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            { role: 'user', parts: [{ text: systemPrompt }] },
-            ...messages.slice(-6).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
-            { role: 'user', parts: [{ text: userMsg }] }
-          ],
-          generationConfig: { maxOutputTokens: 1500, temperature: 0.7 },
-        }),
-      });
+      // Call AI
+      const response = await callAI(activeProvider.id, activeModel.id, messagesForAI, apiKey);
+      
+      // Add response to chat
+      setMessages(p => [...p, { role: 'assistant', content: response, timestamp: Date.now() }]);
 
-      const data = await res.json();
-      let reply: string = data.candidates?.[0]?.content?.parts?.[0]?.text || 'I encountered an issue. Please try again.';
-
-      // If AI wants to update the current file
-      if (reply.includes(`UPDATE_FILE:${selectedPath}:`)) {
-        const match = reply.match(/UPDATE_FILE:[^:]+:```[a-z]*\n([\s\S]*?)```/);
-        if (match) {
-          const newCode = match[1];
-          setCode(newCode);
-          reply = reply.replace(/UPDATE_FILE:[^`]*```[a-z]*\n[\s\S]*?```/, '').trim();
-          reply = (reply || '✓ File updated successfully.') + '\n\n*I\'ve updated `' + selectedPath + '` with the new code.*';
-          addTermLine('success', `AI agent updated ${selectedPath}`);
+      // BACKGROUND PROCESS: Check if AI wants to run terminal commands
+      // This happens silently - user doesn't see it
+      if (backgroundTerminal && response.includes('`')) {
+        // Look for terminal commands in code blocks
+        const cmdMatch = response.match(/```(?:bash|sh|terminal)\n([\s\S]*?)```/);
+        if (cmdMatch) {
+          const cmd = cmdMatch[1].trim();
+          // Run silently in background
+          backgroundTerminal.execute(cmd).then(result => {
+            // If command modified files, sync them
+            if (cmd.startsWith('touch') || cmd.startsWith('mkdir') || cmd.startsWith('rm') || cmd.startsWith('mv')) {
+              // Refresh files from terminal
+              const terminalFiles = backgroundTerminal.getFiles();
+              // This would need proper sync logic
+              console.log('Background terminal updated files');
+            }
+          }).catch(console.error);
         }
       }
 
-      setMessages(prev => [...prev, { role: 'assistant', content: reply, timestamp: Date.now() }]);
-    } catch (err) {
-      const isNoKey = err instanceof Error && err.message === 'no-key';
-      const fallback = isNoKey
-        ? "I'm ready to help! To enable AI responses, add your `NEXT_PUBLIC_GEMINI_API_KEY` in the environment settings. I can still help you navigate the workspace, search APIs, and use the terminal."
-        : "Sorry, I couldn't connect to the AI. Please check your API key and try again.";
-      setMessages(prev => [...prev, { role: 'assistant', content: fallback, timestamp: Date.now() }]);
+    } catch (error) {
+      setMessages(p => [...p, { 
+        role: 'assistant', 
+        content: `Error: ${error instanceof Error ? error.message : 'Failed to communicate with AI'}`,
+        timestamp: Date.now()
+      }]);
     } finally {
       setAiLoading(false);
     }
   };
 
-  // API Search
-  const apiCategories = ['All', ...Array.from(new Set(PUBLIC_APIS.map(a => a.category)))];
-  const filteredApis = PUBLIC_APIS.filter(a =>
-    (apiCategory === 'All' || a.category === apiCategory) &&
-    (a.name.toLowerCase().includes(apiSearch.toLowerCase()) || a.description.toLowerCase().includes(apiSearch.toLowerCase()) || a.category.toLowerCase().includes(apiSearch.toLowerCase()))
-  );
-
-  // Format AI message with code highlighting
-  const formatMessage = (text: string) => {
-    const parts = text.split(/(```[\s\S]*?```)/g);
-    return parts.map((part, i) => {
-      if (part.startsWith('```')) {
-        const lines = part.slice(3, -3).split('\n');
-        const lang = lines[0];
-        const code = lines.slice(1).join('\n');
-        return (
-          <div key={i} className="my-2 rounded-lg overflow-hidden" style={{ background: '#0d1117', border: '1px solid var(--glass-border)' }}>
-            <div className="flex items-center justify-between px-3 py-1.5" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-              <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>{lang || 'code'}</span>
-              <button className="text-[10px]" style={{ color: 'var(--accent)' }}
-                onClick={() => { setCode(code); addTermLine('info', 'AI code applied to editor'); }}>
-                Apply to editor
-              </button>
-            </div>
-            <pre className="text-xs p-3 overflow-x-auto font-code leading-relaxed" style={{ color: '#e2e8f0' }}>{code}</pre>
-          </div>
-        );
-      }
-      return <span key={i} className="whitespace-pre-wrap leading-relaxed">{part}</span>;
-    });
-  };
-
-  if (!project && id) {
-    return (
-      <div className="h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
-        <div className="text-center">
-          <HiFolder className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--text-muted)' }} />
-          <p className="text-sm text-white mb-4">Project not found</p>
-          <Link href="/dashboard/projects" className="btn-ghost text-sm">← Back to Projects</Link>
-        </div>
-      </div>
-    );
-  }
+  // Search in code
+  const searchMatches = codeSearch ? code.split('\n').reduce((acc, line, i) => {
+    if (line.toLowerCase().includes(codeSearch.toLowerCase())) acc.push({ line: i + 1, text: line.trim() });
+    return acc;
+  }, [] as { line: number; text: string }[]) : [];
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
-      {/* Top bar */}
-      <div className="flex items-center gap-3 px-3 h-11 shrink-0" style={{ background: 'rgba(8,12,20,0.98)', borderBottom: '1px solid var(--glass-border)' }}>
-        <Link href="/dashboard/projects" className="flex items-center gap-1.5 text-xs transition-colors px-2 py-1 rounded-lg"
-          style={{ color: 'var(--text-muted)' }}
-          onMouseOver={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; (e.currentTarget as HTMLElement).style.background = 'var(--bg-card)'; }}
-          onMouseOut={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
-          <HiArrowLeft className="w-3.5 h-3.5" /> Projects
-        </Link>
-        <div className="w-px h-4 mx-1" style={{ background: 'var(--glass-border)' }} />
-
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-          <HiFolder className="w-3.5 h-3.5" />
-          <span className="text-white font-medium">{project?.name || id}</span>
-          {selectedPath && <><span>/</span><span style={{ color: 'var(--accent)' }}>{selectedPath.split('/').pop()}</span></>}
+    <div className="h-screen flex bg-[#0a0c10] text-white">
+      {/* Ultra compact sidebar */}
+      <div style={{ width: sidebarCollapsed ? 40 : 180, borderRight: '1px solid rgba(255,255,255,0.1)' }}>
+        <div className="h-8 flex items-center justify-between px-2 border-b border-white/10">
+          {!sidebarCollapsed && <Link href="/dashboard/projects" className="text-white/40 hover:text-white/80"><HiArrowLeft size={14} /></Link>}
+          <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="text-white/40 hover:text-white/80"><HiMenu size={14} /></button>
+        </div>
+        
+        <div className="p-1 space-y-0.5">
+          {[
+            { id: 'code', icon: BsFileCode, label: 'Code' },
+            { id: 'files', icon: HiOutlineFolder, label: 'Files' },
+            { id: 'ai', icon: BsRobot, label: 'AI Chat' },
+            { id: 'term', icon: BsTerminal, label: 'Terminal' },
+          ].map(item => (
+            <button key={item.id} onClick={() => setCurrentView(item.id as ViewMode)}
+              className={`w-full flex items-center gap-2 px-2 py-1 rounded ${currentView === item.id ? 'bg-blue-600/20 text-blue-400' : 'text-white/40 hover:bg-white/5'}`}>
+              <item.icon size={14} />
+              {!sidebarCollapsed && <span className="text-[11px]">{item.label}</span>}
+            </button>
+          ))}
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          {/* Save */}
-          <button onClick={saveCurrentFile} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all font-medium"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}
-            onMouseOver={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
-            onMouseOut={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; }}>
-            Save
-          </button>
-          {/* Run */}
-          <button onClick={() => { setBottomPanel('terminal'); setTimeout(() => COMMANDS.run([]), 100); }}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all font-medium"
-            style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)', color: '#34d399' }}>
-            <BsPlay className="w-3 h-3" /> Run
-          </button>
-          {/* GitHub */}
-          <button onClick={() => setShowGithubImport(true)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}>
-            <BsGithub className="w-3.5 h-3.5" /> Import
-          </button>
-          {/* Panel toggles */}
-          <button onClick={() => setRightPanel(p => p === 'ai' ? null : 'ai')}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all"
-            style={{ background: rightPanel === 'ai' ? 'rgba(129,140,248,0.15)' : 'var(--bg-card)', border: `1px solid ${rightPanel === 'ai' ? 'rgba(129,140,248,0.3)' : 'var(--glass-border)'}`, color: rightPanel === 'ai' ? 'var(--accent)' : 'var(--text-secondary)' }}>
-            <BsRobot className="w-3.5 h-3.5" /> AI
-          </button>
-          <button onClick={() => setRightPanel(p => p === 'api' ? null : 'api')}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all"
-            style={{ background: rightPanel === 'api' ? 'rgba(129,140,248,0.15)' : 'var(--bg-card)', border: `1px solid ${rightPanel === 'api' ? 'rgba(129,140,248,0.3)' : 'var(--glass-border)'}`, color: rightPanel === 'api' ? 'var(--accent)' : 'var(--text-secondary)' }}>
-            <BsGlobe className="w-3.5 h-3.5" /> APIs
-          </button>
-        </div>
+        {!sidebarCollapsed && project && (
+          <div className="absolute bottom-2 left-2 right-2 p-2 bg-white/5 rounded text-[10px] truncate">
+            {project.name}
+          </div>
+        )}
       </div>
 
-      {/* Body */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* File sidebar */}
-        <div className="flex flex-col shrink-0 transition-all duration-200" style={{ width: sidebarCollapsed ? 40 : 200, borderRight: '1px solid var(--glass-border)', background: 'rgba(8,12,20,0.95)' }}>
-          {sidebarCollapsed ? (
-            <button onClick={() => setSidebarCollapsed(false)} className="flex items-center justify-center h-full w-full" style={{ color: 'var(--text-muted)' }}>
-              <HiFolder className="w-4 h-4" />
-            </button>
-          ) : (
-            <>
-              <div className="flex items-center justify-between px-3 py-2 shrink-0" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Explorer</span>
-                <div className="flex gap-1">
-                  <button onClick={() => setShowNewFile(true)} className="p-1 rounded transition-colors" style={{ color: 'var(--text-muted)' }}
-                    title="New file"
-                    onMouseOver={e => (e.currentTarget.style.color = 'var(--text-primary)')}
-                    onMouseOut={e => (e.currentTarget.style.color = 'var(--text-muted)')}>
-                    <BsPlus className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => setSidebarCollapsed(true)} className="p-1 rounded transition-colors" style={{ color: 'var(--text-muted)' }}
-                    onMouseOver={e => (e.currentTarget.style.color = 'var(--text-primary)')}
-                    onMouseOut={e => (e.currentTarget.style.color = 'var(--text-muted)')}>
-                    <BsX className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+      {/* Main content */}
+      <div className="flex-1 overflow-hidden">
+        {/* CODE VIEW */}
+        {currentView === 'code' && (
+          <div className="h-full flex flex-col">
+            <div className="h-8 flex items-center justify-between px-2 border-b border-white/10 bg-[#0c0e14]">
+              <div className="flex items-center gap-2 text-[11px]">
+                <span className="text-white/40">{selectedPath.split('/').pop() || 'No file'}</span>
+                {selectedPath && <span className="text-white/20">|</span>}
+                {selectedPath && <span className="text-white/30">{code.split('\n').length} lines</span>}
               </div>
-
-              {showNewFile && (
-                <div className="px-2 py-1.5" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                  <input autoFocus value={newFileName} onChange={e => setNewFileName(e.target.value)}
-                    placeholder="filename.ts" className="w-full text-xs rounded-lg px-2 py-1.5 outline-none"
-                    style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border-focus)', color: 'var(--text-primary)' }}
-                    onKeyDown={e => { if (e.key === 'Enter') addFile(); if (e.key === 'Escape') setShowNewFile(false); }} />
-                </div>
-              )}
-
-              <div className="flex-1 overflow-y-auto py-1.5">
-                <FileTree nodes={files} onSelect={selectFile} selectedPath={selectedPath} onDelete={deleteFile} />
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Editor + bottom panel */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Tab bar */}
-          <div className="flex items-center shrink-0 px-2 gap-1 h-9" style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(13,17,23,0.95)' }}>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-t-lg text-xs font-medium" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderBottom: `2px solid var(--accent)`, color: 'var(--accent)' }}>
-              <BsFileCode className="w-3 h-3" />
-              {selectedPath.split('/').pop()}
-            </div>
-          </div>
-
-          {/* Monaco */}
-          <div className="flex-1 overflow-hidden" style={{ minHeight: bottomPanel ? 0 : 'auto' }}>
-            <MonacoEditor
-              value={code}
-              language={selectedNode?.language || getLang(selectedPath)}
-              theme="vs-dark"
-              onChange={v => setCode(v || '')}
-              options={{
-                fontSize: 13,
-                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                fontLigatures: true,
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                lineNumbers: 'on',
-                renderLineHighlight: 'gutter',
-                padding: { top: 16 },
-                smoothScrolling: true,
-                cursorBlinking: 'smooth',
-                cursorSmoothCaretAnimation: 'on',
-                tabSize: 2,
-              }}
-            />
-          </div>
-
-          {/* Bottom panel */}
-          {bottomPanel && (
-            <div className="flex flex-col shrink-0" style={{ height: 220, borderTop: '1px solid var(--glass-border)', background: 'rgba(5,8,14,0.98)' }}>
-              {/* Panel tabs */}
-              <div className="flex items-center gap-1 px-3 h-8 shrink-0" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                <button onClick={() => setBottomPanel('terminal')}
-                  className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded transition-colors"
-                  style={{ background: bottomPanel === 'terminal' ? 'var(--bg-card)' : 'transparent', color: bottomPanel === 'terminal' ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                  <BsTerminal className="w-3 h-3" /> Terminal
-                </button>
-                <button onClick={() => setBottomPanel('preview')}
-                  className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded transition-colors"
-                  style={{ background: bottomPanel === 'preview' ? 'var(--bg-card)' : 'transparent', color: bottomPanel === 'preview' ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                  <BsPlay className="w-3 h-3" /> Preview
-                </button>
-                <button onClick={() => setBottomPanel(null)} className="ml-auto p-1 rounded transition-colors" style={{ color: 'var(--text-muted)' }}
-                  onMouseOver={e => (e.currentTarget.style.color = 'var(--text-primary)')}
-                  onMouseOut={e => (e.currentTarget.style.color = 'var(--text-muted)')}>
-                  <HiX className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Terminal content */}
-              {bottomPanel === 'terminal' && (
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  <div className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5" onClick={() => termInputRef.current?.focus()}>
-                    {termLines.map((line, i) => (
-                      <div key={i} className="text-xs font-code leading-relaxed" style={{
-                        color: line.type === 'input' ? 'var(--accent)' : line.type === 'error' ? 'var(--danger)' : line.type === 'success' ? '#34d399' : line.type === 'info' ? '#60a5fa' : 'rgba(255,255,255,0.65)',
-                      }}>
-                        {line.text}
-                      </div>
-                    ))}
-                    <div ref={termEndRef} />
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-2 shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                    <span className="text-xs font-code" style={{ color: 'var(--accent)' }}>$</span>
-                    <input ref={termInputRef} value={termInput} onChange={e => setTermInput(e.target.value)}
-                      className="flex-1 bg-transparent text-xs font-code outline-none"
-                      style={{ color: 'var(--text-primary)', caretColor: 'var(--accent)' }}
-                      placeholder="Type a command..."
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') { runTerminalCmd(termInput); setTermInput(''); }
-                        if (e.key === 'ArrowUp') { const h = termHistory[histIdx + 1]; if (h) { setTermInput(h); setHistIdx(i => i + 1); } }
-                        if (e.key === 'ArrowDown') { const h = termHistory[histIdx - 1]; setTermInput(h || ''); setHistIdx(i => Math.max(-1, i - 1)); }
-                        if (e.key === 'l' && e.ctrlKey) { e.preventDefault(); setTermLines([]); }
-                      }} />
-                  </div>
-                </div>
-              )}
-
-              {/* Preview content */}
-              {bottomPanel === 'preview' && (
-                <div className="flex-1 overflow-hidden">
-                  <iframe
-                    title="preview"
-                    className="w-full h-full border-0"
-                    srcDoc={`<!DOCTYPE html><html><head><style>body{background:#080c14;color:#e2e8f0;font-family:system-ui,sans-serif;padding:20px;margin:0} pre{background:#0d1117;padding:16px;border-radius:8px;overflow:auto;font-size:12px;line-height:1.6}</style></head><body><h2 style="color:#818cf8;margin-top:0">Live Preview</h2><p style="color:#94a3b8;font-size:14px">Web preview runs HTML/CSS/JS code.</p><pre>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre></body></html>`}
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <BsSearch className="absolute left-2 top-1/2 -translate-y-1/2 text-white/30" size={10} />
+                  <input
+                    value={codeSearch}
+                    onChange={e => setCodeSearch(e.target.value)}
+                    placeholder="Search in file..."
+                    className="w-36 pl-6 pr-2 py-0.5 text-[10px] bg-black/40 rounded border border-white/10 focus:border-blue-400 outline-none"
                   />
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* Bottom panel toggle when closed */}
-          {!bottomPanel && (
-            <div className="flex items-center gap-2 px-3 py-1 shrink-0" style={{ borderTop: '1px solid var(--glass-border)', background: 'rgba(8,12,20,0.98)' }}>
-              <button onClick={() => setBottomPanel('terminal')} className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded transition-colors"
-                style={{ color: 'var(--text-muted)' }}
-                onMouseOver={e => (e.currentTarget.style.color = 'var(--accent)')}
-                onMouseOut={e => (e.currentTarget.style.color = 'var(--text-muted)')}>
-                <BsTerminal className="w-3 h-3" /> Terminal
-              </button>
-              <button onClick={() => setBottomPanel('preview')} className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded transition-colors"
-                style={{ color: 'var(--text-muted)' }}
-                onMouseOver={e => (e.currentTarget.style.color = 'var(--accent)')}
-                onMouseOut={e => (e.currentTarget.style.color = 'var(--text-muted)')}>
-                <BsPlay className="w-3 h-3" /> Preview
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Right panel: AI Agent */}
-        {rightPanel === 'ai' && (
-          <div className="flex flex-col shrink-0" style={{ width: 320, borderLeft: '1px solid var(--glass-border)', background: 'rgba(8,12,20,0.97)' }}>
-            <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'var(--accent-glow)' }}>
-                  <BsRobot className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+                <div className="text-[8px] text-white/30 bg-white/5 px-1.5 py-0.5 rounded">
+                  BG Terminal Active
                 </div>
-                <span className="text-xs font-semibold text-white">AI Code Agent</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] font-medium" style={{ color: '#34d399' }}>
-                <div className="w-1.5 h-1.5 rounded-full bg-[#34d399] animate-pulse" /> Online
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-3 space-y-3">
-              {messages.map((msg, i) => (
-                <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-bold mt-0.5"
-                    style={{ background: msg.role === 'assistant' ? 'var(--accent-glow)' : 'rgba(255,255,255,0.08)', color: msg.role === 'assistant' ? 'var(--accent)' : 'var(--text-secondary)' }}>
-                    {msg.role === 'assistant' ? '✦' : 'U'}
+            {codeSearch && searchMatches.length > 0 && (
+              <div className="absolute top-8 right-4 w-64 z-10 bg-[#1a1e24] border border-white/10 rounded shadow-lg p-1 max-h-40 overflow-auto">
+                {searchMatches.map((m, i) => (
+                  <div key={i} className="text-[9px] px-2 py-1 hover:bg-white/5 cursor-pointer truncate" onClick={() => {}}>
+                    <span className="text-white/40">L{m.line}:</span> {m.text}
                   </div>
-                  <div className="flex-1 text-xs leading-relaxed rounded-xl px-3 py-2.5 max-w-[240px]"
-                    style={{ background: msg.role === 'assistant' ? 'var(--bg-card)' : 'rgba(129,140,248,0.12)', border: `1px solid ${msg.role === 'assistant' ? 'var(--glass-border)' : 'rgba(129,140,248,0.2)'}`, color: 'var(--text-primary)' }}>
-                    {formatMessage(msg.content)}
+                ))}
+              </div>
+            )}
+
+            <div className="flex-1">
+              <MonacoEditor
+                value={code}
+                language={selectedPath ? getLang(selectedPath) : 'plaintext'}
+                theme="vs-dark"
+                onChange={handleCodeChange}
+                options={{ fontSize: 12, minimap: { enabled: false }, lineNumbers: 'on', padding: { top: 8 } }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* FILES VIEW with Save Button */}
+        {currentView === 'files' && (
+          <div className="h-full flex flex-col">
+            <div className="h-8 flex items-center justify-between px-2 border-b border-white/10 bg-[#0c0e14]">
+              <span className="text-[11px] font-medium text-white/70">EXPLORER</span>
+              <div className="flex gap-1">
+                <button onClick={() => setCreatingIn({ path: '', type: 'file' })} className="p-1 text-white/40 hover:text-white/80" title="New file"><BsPlus size={14} /></button>
+                <button onClick={() => setCreatingIn({ path: '', type: 'folder' })} className="p-1 text-white/40 hover:text-white/80" title="New folder"><BsFolder size={12} /></button>
+              </div>
+            </div>
+
+            {/* File creation with Save button */}
+            {creatingIn && (
+              <div className="p-2 border-b border-white/10 bg-white/5 flex gap-1">
+                <input
+                  value={newFileName}
+                  onChange={e => setNewFileName(e.target.value)}
+                  placeholder={creatingIn.type === 'file' ? 'filename.ts' : 'folder name'}
+                  className="flex-1 px-2 py-1 text-[11px] bg-black/40 border border-white/20 rounded outline-none focus:border-blue-400"
+                  onKeyDown={e => e.key === 'Enter' && handleCreateItem()}
+                  autoFocus
+                />
+                <button
+                  onClick={handleCreateItem}
+                  className="px-2 py-1 bg-blue-600 text-white text-[10px] rounded hover:bg-blue-700 flex items-center gap-1"
+                >
+                  <BsPlus size={12} /> Save
+                </button>
+                <button
+                  onClick={() => setCreatingIn(null)}
+                  className="px-2 py-1 bg-white/10 text-white/60 text-[10px] rounded hover:bg-white/20"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-auto p-1">
+              <FileTree
+                nodes={files}
+                onSelect={handleSelectFile}
+                selectedPath={selectedPath}
+                onDelete={handleDeleteFile}
+                onRename={handleRename}
+                onAdd={(path, type) => setCreatingIn({ path, type })}
+                expanded={expandedFolders}
+                setExpanded={setExpandedFolders}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* AI CHAT - NORMAL CHAT THAT WORKS */}
+        {currentView === 'ai' && (
+          <div className="h-full flex flex-col">
+            <div className="h-8 flex items-center justify-between px-2 border-b border-white/10 bg-[#0c0e14]">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-white/70">AI ASSISTANT</span>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setShowProviderSelector(!showProviderSelector)} className="text-[9px] px-1.5 py-0.5 bg-white/10 rounded hover:bg-white/20">
+                    {activeProvider.shortName} <BsChevronDown size={8} className="inline" />
+                  </button>
+                  <button onClick={() => setShowModelSelector(!showModelSelector)} className="text-[9px] px-1.5 py-0.5 bg-white/10 rounded hover:bg-white/20">
+                    {activeModel.name.split(' ')[0]} <BsChevronDown size={8} className="inline" />
+                  </button>
+                </div>
+              </div>
+              <div className={`text-[8px] px-1.5 py-0.5 rounded-full ${getApiKey(activeProvider.id) ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                {getApiKey(activeProvider.id) ? '✓ API Key' : 'No Key'}
+              </div>
+            </div>
+
+            {/* Messages - normal chat */}
+            <div className="flex-1 overflow-auto p-2 space-y-2 text-[11px]">
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex gap-1.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                  <div className={`w-4 h-4 rounded flex items-center justify-center text-[8px] shrink-0 ${
+                    msg.role === 'assistant' ? 'bg-purple-500/20' : 'bg-blue-500/20'
+                  }`}>
+                    {msg.role === 'assistant' ? 'AI' : 'U'}
+                  </div>
+                  <div className={`flex-1 px-2 py-1 rounded ${
+                    msg.role === 'assistant' ? 'bg-white/5' : 'bg-blue-600'
+                  }`}>
+                    <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                    <div className="text-[7px] text-white/30 mt-1">
+                      {new Date(msg.timestamp).toLocaleTimeString()}
+                    </div>
                   </div>
                 </div>
               ))}
               {aiLoading && (
-                <div className="flex gap-2">
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--accent-glow)', color: 'var(--accent)' }}>✦</div>
-                  <div className="px-3 py-2.5 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
-                    <div className="flex gap-1">
-                      {[0, 1, 2].map(i => <div key={i} className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--accent)', animationDelay: `${i * 0.15}s` }} />)}
-                    </div>
-                  </div>
+                <div className="flex items-center gap-2 text-white/40 text-[10px]">
+                  <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+                  AI is thinking...
                 </div>
               )}
               <div ref={chatEndRef} />
             </div>
 
-            {/* Quick actions */}
-            <div className="px-3 py-2 shrink-0" style={{ borderTop: '1px solid var(--glass-border)' }}>
-              <div className="flex flex-wrap gap-1 mb-2">
-                {['Explain this code', 'Add error handling', 'Write tests', 'Optimise'].map(q => (
-                  <button key={q} onClick={() => setInput(q)}
-                    className="text-[10px] px-2 py-1 rounded-lg transition-colors"
-                    style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}
-                    onMouseOver={e => { (e.currentTarget as HTMLElement).style.color = 'var(--accent)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(129,140,248,0.3)'; }}
-                    onMouseOut={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--glass-border)'; }}>
-                    {q}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-2">
+            {/* Input */}
+            <div className="p-2 border-t border-white/10">
+              <div className="flex gap-1">
                 <input
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                  placeholder="Ask the AI agent..."
-                  className="flex-1 text-xs rounded-xl px-3 py-2 outline-none transition-all"
-                  style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
-                  onFocus={e => e.target.style.borderColor = 'var(--input-border-focus)'}
-                  onBlur={e => e.target.style.borderColor = 'var(--input-border)'}
+                  placeholder="Ask me anything about your code..."
+                  className="flex-1 px-2 py-1 text-[11px] bg-black/40 border border-white/10 rounded outline-none focus:border-blue-400"
                 />
-                <button onClick={sendMessage} disabled={aiLoading || !input.trim()}
-                  className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all"
-                  style={{ background: 'var(--accent)', opacity: aiLoading || !input.trim() ? 0.5 : 1 }}>
-                  <HiLightningBolt className="w-3.5 h-3.5 text-white" />
+                <button 
+                  onClick={sendMessage} 
+                  disabled={aiLoading || !input.trim() || !getApiKey(activeProvider.id)} 
+                  className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center disabled:opacity-50"
+                >
+                  <HiLightningBolt size={12} />
                 </button>
+              </div>
+              <div className="text-[7px] text-white/20 mt-1 text-center">
+                Background terminal active • File operations run silently
               </div>
             </div>
           </div>
         )}
 
-        {/* Right panel: API Search */}
-        {rightPanel === 'api' && (
-          <div className="flex flex-col shrink-0" style={{ width: 320, borderLeft: '1px solid var(--glass-border)', background: 'rgba(8,12,20,0.97)' }}>
-            <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(96,165,250,0.15)' }}>
-                  <BsGlobe className="w-3.5 h-3.5" style={{ color: '#60a5fa' }} />
-                </div>
-                <span className="text-xs font-semibold text-white">API Search</span>
-              </div>
-              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{PUBLIC_APIS.length} APIs</span>
+        {/* TERMINAL VIEW - For debugging */}
+        {currentView === 'term' && (
+          <div className="h-full flex flex-col">
+            <div className="h-8 flex items-center px-2 border-b border-white/10 bg-[#0c0e14]">
+              <span className="text-[11px] font-medium text-white/70">BACKGROUND TERMINAL</span>
+              <span className="ml-2 text-[8px] text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded">Active</span>
             </div>
-
-            <div className="px-3 pt-3 space-y-2 shrink-0">
-              <div className="relative">
-                <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
-                <input value={apiSearch} onChange={e => setApiSearch(e.target.value)} placeholder="Search APIs..."
-                  className="w-full pl-8 pr-3 py-2 text-xs rounded-xl outline-none transition-all"
-                  style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', color: 'var(--text-primary)' }}
-                  onFocus={e => e.target.style.borderColor = 'var(--input-border-focus)'}
-                  onBlur={e => e.target.style.borderColor = 'var(--input-border)'}
-                />
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {apiCategories.map(cat => (
-                  <button key={cat} onClick={() => setApiCategory(cat)}
-                    className="text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors"
-                    style={{
-                      background: apiCategory === cat ? 'rgba(96,165,250,0.15)' : 'var(--bg-card)',
-                      border: `1px solid ${apiCategory === cat ? 'rgba(96,165,250,0.3)' : 'var(--glass-border)'}`,
-                      color: apiCategory === cat ? '#60a5fa' : 'var(--text-muted)',
-                    }}>
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-3 space-y-2 mt-1">
-              {filteredApis.map((api, i) => (
-                <div key={i} className="rounded-xl p-3 transition-all cursor-pointer group" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}
-                  onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--glass-border-hover)'; }}
-                  onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--glass-border)'; }}>
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <div>
-                      <span className="text-xs font-semibold text-white">{api.name}</span>
-                      <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(96,165,250,0.1)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.2)' }}>{api.category}</span>
-                    </div>
-                    <a href={api.url} target="_blank" rel="noopener noreferrer" className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded" style={{ color: 'var(--accent)' }}>
-                      <BsArrowUpRight className="w-3 h-3" />
-                    </a>
-                  </div>
-                  <p className="text-[11px] leading-snug mb-2" style={{ color: 'var(--text-secondary)' }}>{api.description}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px]" style={{ color: api.auth === 'None' ? '#34d399' : 'var(--text-muted)' }}>
-                      🔑 {api.auth}
-                    </span>
-                    <button
-                      className="text-[10px] px-2 py-0.5 rounded-lg font-medium transition-colors"
-                      style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid rgba(129,140,248,0.2)' }}
-                      onClick={() => {
-                        const snippet = `// ${api.name} API\n// Docs: ${api.url}\n// Auth: ${api.auth}\n\nconst response = await fetch('${api.url.replace('docs', 'api')}', {\n  headers: {\n    'Authorization': 'Bearer YOUR_API_KEY',\n    'Content-Type': 'application/json'\n  }\n});\nconst data = await response.json();\n`;
-                        setCode(prev => prev + '\n\n' + snippet);
-                        addTermLine('info', `Added ${api.name} code snippet to editor`);
-                      }}>
-                      Use API
-                    </button>
-                  </div>
+            <div className="flex-1 overflow-auto p-2 font-mono text-[11px] bg-black/60">
+              {termLines.map((line, i) => (
+                <div key={i} className={`leading-relaxed ${
+                  line.type === 'error' ? 'text-red-400' : 
+                  line.type === 'input' ? 'text-green-400' :
+                  'text-white/70'
+                }`}>
+                  {line.text}
                 </div>
               ))}
+              <div ref={termEndRef} />
+            </div>
+            <div className="p-2 border-t border-white/10">
+              <div className="flex items-center gap-1">
+                <span className="text-green-400 text-[11px]">$</span>
+                <input
+                  value={termInput}
+                  onChange={e => setTermInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (runTerminalCommand(), setTermInput(''))}
+                  className="flex-1 bg-transparent text-[11px] outline-none font-mono"
+                  placeholder="Run commands (for debugging)"
+                />
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* GitHub Import Modal */}
-      {showGithubImport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)' }}>
-          <div className="glass rounded-2xl p-7 w-full max-w-md animate-scaleIn">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <BsGithub className="w-5 h-5 text-white" />
-                <h2 className="text-base font-bold text-white">Import GitHub Repository</h2>
-              </div>
-              <button onClick={() => setShowGithubImport(false)} style={{ color: 'var(--text-muted)' }}>
-                <HiX className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>Enter a public repository URL. The AI agent will analyse the codebase on import.</p>
-            <input value={githubUrl} onChange={e => setGithubUrl(e.target.value)} placeholder="https://github.com/username/repo"
-              className="input-base mb-4" onKeyDown={e => e.key === 'Enter' && importGithub()} />
-            <div className="glass rounded-xl p-3 mb-5 text-xs" style={{ color: 'var(--text-muted)' }}>
-              Note: Only public repos. Max 20 files imported. Large repos may be truncated.
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setShowGithubImport(false)} className="btn-ghost flex-1">Cancel</button>
-              <button onClick={importGithub} disabled={githubLoading} className="btn-primary flex-1 gap-2" style={{ opacity: githubLoading ? 0.6 : 1 }}>
-                {githubLoading ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Importing...</> : <><BsGithub className="w-4 h-4" /> Import</>}
-              </button>
-            </div>
-          </div>
+      {/* Model selectors */}
+      {showProviderSelector && (
+        <div className="absolute top-8 left-1/2 w-32 bg-[#1a1e24] border border-white/10 rounded shadow-lg z-50">
+          {AI_PROVIDERS.map(p => (
+            <button key={p.id} onClick={() => { setActiveProvider(p.id); setShowProviderSelector(false); }}
+              className="w-full text-left px-3 py-1.5 text-[11px] hover:bg-white/10">
+              {p.shortName}
+            </button>
+          ))}
+        </div>
+      )}
+      {showModelSelector && (
+        <div className="absolute top-8 left-1/2 w-48 bg-[#1a1e24] border border-white/10 rounded shadow-lg z-50 max-h-60 overflow-auto">
+          {activeProvider.models.map(m => (
+            <button key={m.id} onClick={() => { setActiveModel(m.id); setShowModelSelector(false); }}
+              className="w-full text-left px-3 py-1.5 hover:bg-white/10">
+              <div className="text-[11px]">{m.name}</div>
+              <div className="text-[8px] text-white/40">{m.description}</div>
+            </button>
+          ))}
         </div>
       )}
     </div>
