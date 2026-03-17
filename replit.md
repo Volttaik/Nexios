@@ -72,14 +72,36 @@ app/
 
 ### Project Workspace Features (`/dashboard/projects/[id]`)
 
-- **File tree** — collapsible sidebar, create/delete files, folder expand
-- **Monaco editor** — VS Code editor with syntax highlighting, 40+ languages
-- **AI Code Agent** — Gemini-powered chat that reads workspace files, writes code to editor
-- **Terminal** — Browser-based terminal with: ls, cat, run, test, install, git status, clear
-- **Live Preview** — iframe preview for HTML/CSS/JS code
-- **GitHub Import** — fetches public repo files via GitHub REST API (max 20 files)
-- **API Search** — 12+ curated public APIs with category filter, one-click code snippets
-- **Panel system** — collapsible right panel (AI / APIs) and bottom panel (Terminal / Preview)
+**4-Agent System:**
+- **Agent 1 (User Agent)**: Handles all user interaction — the only agent the user talks to directly
+- **Agent 2 (Environment Agent)**: Works in the background, edits/creates files live as instructed
+- **Agent 3 (Coordinator)**: Analyses Agent 1's response, extracts file operations, routes to Agent 2
+- **Agent 4 (Checker)**: Validates all file operations and agent sync after each action
+
+**UI Panels:**
+- **Left sidebar** — File tree (Agent 2's working area), collapsible, create/delete/rename files
+- **Center content** — 4 tabs: Code (Monaco editor), Files list, Design canvas, Document editor
+- **Right panel** — 3 tabs: Chat (Agent 1), Agents (all 4 agent status + logs), Terminal (env shell)
+- **Top bar** — Project name, type badge, all 4 agent badges, export button, model selector
+
+**Content Modes:**
+- **Code**: Monaco editor with syntax highlighting, 40+ languages
+- **Files**: Visual file browser
+- **Design**: Figma import + AI-generated UI via Agent 1
+- **Document**: Markdown/text editor with AI assistance
+
+**Other Features:**
+- **GitHub Import** — fetches public repo metadata via GitHub REST API
+- **Figma Import** — creates design project from Figma file URL
+- **Export** — downloads project as JSON (files + chat history)
+- **Save** — auto-saves to localStorage on every change
+
+### Projects Page (`/dashboard/projects`)
+
+- **Project types**: Code, Design, Document (visual selection in create modal + filter tabs)
+- **GitHub Import** — imports public repos
+- **Figma Import** — creates design projects from Figma URLs
+- **Type filter** — filter projects by All / Code / Design / Document
 
 ### Environment Variables
 
