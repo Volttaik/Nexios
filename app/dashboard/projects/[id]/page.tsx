@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import {
@@ -163,18 +163,38 @@ function parseAIResponse(raw: string): { text: string; ops: FileOp[] } {
 }
 
 // ─────────────────────────── Thinking Animation ───────────────────────────
+const THINKING_STEPS = [
+  'Reading your request…',
+  'Analyzing project context…',
+  'Planning file structure…',
+  'Writing code…',
+  'Applying changes…',
+];
+
 function ThinkingAnimation() {
+  const [stepIdx, setStepIdx] = React.useState(0);
+
+  React.useEffect(() => {
+    const t = setInterval(() => setStepIdx(i => (i + 1) % THINKING_STEPS.length), 1800);
+    return () => clearInterval(t);
+  }, []);
+
   return (
-    <div className="flex items-center gap-2 px-3 py-2.5">
-      <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(99,102,241,0.2)' }}>
-        <BsStars size={12} className="text-indigo-400" />
+    <div className="flex gap-2 items-start">
+      <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+        style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.35)' }}>
+        <BsStars size={11} className="text-indigo-400" style={{ animation: 'spin 3s linear infinite' }} />
       </div>
-      <div className="flex items-center gap-1">
-        {[0,1,2,3,4].map(i => (
-          <div key={i} className="thinking-bar" style={{ animationDelay: `${i * 120}ms` }} />
-        ))}
+      <div className="flex flex-col gap-1.5 px-3 py-2.5 rounded-2xl rounded-tl-sm" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="flex items-center gap-1.5">
+          {[0,1,2,3,4].map(i => (
+            <div key={i} className="thinking-bar" style={{ animationDelay: `${i * 110}ms` }} />
+          ))}
+        </div>
+        <span className="text-[10px] text-white/35 transition-all duration-500" style={{ minWidth: 120 }}>
+          {THINKING_STEPS[stepIdx]}
+        </span>
       </div>
-      <span className="text-[10px] text-white/30 ml-1">Working…</span>
     </div>
   );
 }
@@ -580,7 +600,10 @@ export default function ProjectWorkspace() {
     const cmd = termInput.trim();
     setTermLines(p => [...p, { type: 'input', text: `$ ${cmd}` }]);
     setTermInput('');
-    const [command, ...args] = cmd.split(' ');
+    const parts = cmd.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+    const command = parts[0];
+    const args = parts.slice(1).map(a => a.replace(/^['"]|['"]$/g, ''));
+
     if (command === 'ls') {
       const paths = getAllFilePaths(files);
       if (paths.length === 0) setTermLines(p => [...p, { type: 'output', text: '(empty workspace)' }]);
@@ -597,13 +620,67 @@ export default function ProjectWorkspace() {
       setTermLines(p => [...p, { type: 'success', text: `Deleted: ${args[0]}` }]);
     } else if (command === 'pwd') {
       setTermLines(p => [...p, { type: 'output', text: `/workspace/${project?.name || id}` }]);
+    } else if (command === 'echo') {
+      setTermLines(p => [...p, { type: 'output', text: args.join(' ') }]);
     } else if (command === 'clear') {
       setTermLines([]);
     } else if (command === 'run') {
       runProject();
       setTermLines(p => [...p, { type: 'success', text: 'Opening project preview...' }]);
+    } else if (command === 'help') {
+      ['ls              list files', 'cat <file>      show file contents', 'touch <file>    create file',
+        'rm <file>       delete file', 'pwd             print working directory', 'echo <text>     print text',
+        'run             run project preview', 'git clone <url> import GitHub repository', 'clear           clear terminal'
+      ].forEach(line => setTermLines(p => [...p, { type: 'output', text: line }]));
+    } else if (command === 'git' && args[0] === 'clone' && args[1]) {
+      const repoUrl = args[1];
+      const match = repoUrl.match(/github\.com\/([^/]+)\/([^/\s.]+)/);
+      if (!match) {
+        setTermLines(p => [...p, { type: 'error', text: 'git clone: only GitHub URLs are supported (https://github.com/owner/repo)' }]);
+        return;
+      }
+      const [, owner, repo] = match;
+      setTermLines(p => [...p, { type: 'output', text: `Cloning into '${repo}'…` }]);
+      setTermLines(p => [...p, { type: 'output', text: 'remote: Enumerating objects…' }]);
+      try {
+        const treeResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`);
+        if (!treeResp.ok) {
+          const errData = await treeResp.json().catch(() => ({}));
+          setTermLines(p => [...p, { type: 'error', text: `fatal: ${errData.message || 'repository not found or is private'}` }]);
+          return;
+        }
+        const treeData = await treeResp.json();
+        const fileItems = (treeData.tree as any[]).filter(item => item.type === 'blob' && item.size < 500000);
+        setTermLines(p => [...p, { type: 'output', text: `remote: Total ${fileItems.length} files, fetching…` }]);
+
+        let fetched = 0;
+        let newFiles = [...files];
+        const BATCH = 6;
+        for (let i = 0; i < fileItems.length; i += BATCH) {
+          const batch = fileItems.slice(i, i + BATCH);
+          await Promise.all(batch.map(async (item: any) => {
+            try {
+              const contentResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${item.path}`);
+              if (!contentResp.ok) return;
+              const contentData = await contentResp.json();
+              if (contentData.content) {
+                const decoded = atob(contentData.content.replace(/\n/g, ''));
+                newFiles = addFileByPath(newFiles, item.path, decoded);
+                fetched++;
+              }
+            } catch { /* skip binary/large files */ }
+          }));
+          setTermLines(p => [...p, { type: 'output', text: `  ${Math.min(i + BATCH, fileItems.length)}/${fileItems.length} files fetched…` }]);
+        }
+        setFiles(newFiles);
+        const paths = getAllFilePaths(newFiles);
+        if (paths.length) setSelectedPath(paths[0]);
+        setTermLines(p => [...p, { type: 'success', text: `✓ Cloned ${repo}: ${fetched} files imported into workspace` }]);
+      } catch (err) {
+        setTermLines(p => [...p, { type: 'error', text: `fatal: ${err instanceof Error ? err.message : 'network error'}` }]);
+      }
     } else {
-      setTermLines(p => [...p, { type: 'error', text: `Command not found: ${command}` }]);
+      setTermLines(p => [...p, { type: 'error', text: `${command}: command not found — type 'help' for available commands` }]);
     }
   };
 
@@ -627,27 +704,46 @@ export default function ProjectWorkspace() {
       const autonomousContext = autonomousMode
         ? `\n\nAUTONOMOUS MODE: You have full awareness of your own capabilities and can propose self-improvements.` : '';
 
-      const systemPrompt = `You are Nexios AI — an intelligent coding assistant with direct file system access. You can create, edit, and delete files instantly.
+      const systemPrompt = `You are Nexios AI — a senior full-stack engineer and coding assistant embedded in an IDE with direct file system access. You think before you act, write production-quality code, and always complete the full implementation.
 
-Project: "${project?.name || 'Untitled'}" (${project?.language || 'Unknown'})
-Files: ${allPaths.slice(0, 15).join(', ') || 'none'}${fileContext}${autonomousContext}
+## PROJECT CONTEXT
+Name: "${project?.name || 'Untitled'}"
+Language/Stack: ${project?.language || 'Unknown'}
+Files (${allPaths.length}): ${allPaths.slice(0, 20).join(', ') || 'none'}${fileContext}${autonomousContext}
 
 ## FILE OPERATIONS
-When creating/editing files, output a <nexios_ops> block (never shown to user, executed automatically):
+You MUST use <nexios_ops> to create or edit files. Never paste code in chat — it goes directly into the file system:
+
 <nexios_ops>
 [
-  {"op": "create", "path": "index.html", "content": "<!DOCTYPE html>..."},
-  {"op": "edit", "path": "style.css", "content": "body { margin: 0; }"},
-  {"op": "delete", "path": "old.js"}
+  {"op": "create", "path": "src/index.html", "content": "<!DOCTYPE html>\\n<html lang=\\"en\\">...complete file content..."},
+  {"op": "edit", "path": "src/style.css", "content": "/* complete updated file */"},
+  {"op": "delete", "path": "old-file.js"},
+  {"op": "mkdir", "path": "src/components"}
 ]
 </nexios_ops>
 
-## RULES
-1. When asked to create/edit files — ALWAYS use nexios_ops, NEVER paste code in chat
-2. Your chat response should describe what you're doing — be concise
-3. Always write complete, working, production-quality code
-4. For HTML projects: include proper DOCTYPE, linked CSS/JS references
-5. For conversational questions, answer normally without ops`;
+## CORE RULES
+1. ALWAYS use nexios_ops for any file creation or editing — NEVER paste code blocks in chat
+2. Write COMPLETE files — never truncate with "..." or "// rest of code here"
+3. Think step-by-step: understand the full requirement → plan files → write all of them in one ops block
+4. For multi-file projects, create ALL necessary files in a single response (HTML + CSS + JS, or all components)
+5. Use modern best practices for the detected language/framework
+6. If the user asks a question without requesting code, answer conversationally — no ops needed
+7. After applying ops, briefly explain what you built and how to use it
+8. When editing existing files, always include the COMPLETE new file content — not just the changed section
+
+## LANGUAGE GUIDELINES
+- HTML/CSS/JS: proper DOCTYPE, semantic HTML5, CSS custom properties, ES6+ modules
+- React/Next.js: functional components, TypeScript, proper imports, hooks
+- Python: PEP-8, type hints, docstrings
+- Node.js: ES modules or CommonJS (match existing style), async/await
+
+## QUALITY STANDARDS
+- Production-ready: error handling, loading states, responsive design
+- Accessible: ARIA labels, semantic elements, keyboard navigation
+- Clean: consistent naming, no dead code, logical file structure`;
+
 
       const messagesForAI = [
         { role: 'user' as const, content: systemPrompt },
@@ -1106,7 +1202,7 @@ When creating/editing files, output a <nexios_ops> block (never shown to user, e
                 <div ref={termEndRef} />
               </div>
               <div className="px-2 pt-1 border-t shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-                <div className="text-[9px] text-white/20 mb-1">ls · cat · touch · rm · pwd · run · clear</div>
+                <div className="text-[9px] text-white/20 mb-1">ls · cat · touch · rm · pwd · echo · run · git clone &lt;url&gt; · help · clear</div>
               </div>
               <div className="p-2 flex gap-2 shrink-0">
                 <span className="text-green-400 font-mono text-[11px] mt-1.5">$</span>
