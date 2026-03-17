@@ -3,25 +3,13 @@
 import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-
-function EyeIcon({ open }: { open: boolean }) {
-  return open ? (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-      <circle cx="12" cy="12" r="3"/>
-    </svg>
-  ) : (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4">
-      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
-      <line x1="1" y1="1" x2="23" y2="23"/>
-    </svg>
-  );
-}
+import { BsRobot } from 'react-icons/bs';
+import { HiArrowLeft, HiUser, HiLockClosed, HiEye, HiEyeOff, HiArrowRight, HiShieldCheck } from 'react-icons/hi';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/dashboard/chat';
+  const redirect = searchParams.get('redirect') || '/dashboard';
   const errorParam = searchParams.get('error');
 
   const [formData, setFormData] = useState({ identifier: '', password: '' });
@@ -31,11 +19,12 @@ function LoginForm() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (errorParam === 'invalid_token') setError('Your session has expired. Please login again.');
+    if (errorParam === 'invalid_token') setError('Your session has expired. Please log in again.');
   }, [errorParam]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
     setError('');
   };
 
@@ -44,19 +33,19 @@ function LoginForm() {
     if (!formData.identifier || !formData.password) { setError('All fields are required'); return; }
     setIsLoading(true);
     try {
-      const response = await fetch('/api/login', {
+      const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identifier: formData.identifier, password: formData.password }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Login failed');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Login failed');
       localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify({ ...data.user, _id: data.user._id || data.user.id }));
+      localStorage.setItem('user', JSON.stringify(data.user));
       document.cookie = `auth_token=${data.token}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
       setShowSuccess(true);
       setIsLoading(false);
-      setTimeout(() => router.push('/dashboard/chat'), 1200);
+      setTimeout(() => router.push(redirect.includes('token=') ? redirect : `${redirect}?token=${data.token}`), 1200);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed');
       setIsLoading(false);
@@ -64,119 +53,131 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex" style={{ background: 'var(--bg)' }}>
-      {/* Left decorative panel - hidden on mobile */}
-      <div className="hidden lg:flex lg:w-[420px] xl:w-[480px] flex-col justify-between p-10 relative overflow-hidden shrink-0"
-        style={{ background: 'linear-gradient(135deg, #0d0d10 0%, #1a1040 50%, #0d1a30 100%)' }}>
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/4 -left-20 w-64 h-64 rounded-full opacity-20" style={{ background: 'radial-gradient(circle, #5b78ff, transparent 70%)' }} />
-          <div className="absolute bottom-1/3 right-0 w-48 h-48 rounded-full opacity-15" style={{ background: 'radial-gradient(circle, #8b5cf6, transparent 70%)' }} />
-          <svg className="absolute inset-0 w-full h-full opacity-5" viewBox="0 0 400 600" fill="none">
-            <defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="0.5"/></pattern></defs>
-            <rect width="400" height="600" fill="url(#grid)"/>
-          </svg>
-        </div>
-        <div className="relative z-10">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg" style={{ background: 'linear-gradient(135deg, #5b78ff, #8b5cf6)' }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} className="w-5 h-5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-          </div>
-          <h1 className="text-white text-2xl font-bold mt-4 tracking-tight">Nexios AI</h1>
-          <p className="text-white/50 text-sm mt-1">Your intelligent AI workspace</p>
-        </div>
-        <div className="relative z-10 space-y-5">
-          {[
-            { icon: '⚡', title: 'Multiple AI Models', desc: 'Gemini, GPT-4, Claude, Groq & more' },
-            { icon: '💻', title: 'Code Sandbox', desc: 'VS Code-like editor with AI assistance' },
-            { icon: '🔒', title: 'Secure & Private', desc: 'Your data stays encrypted' },
-          ].map((f, i) => (
-            <div key={i} className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-base" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}>{f.icon}</div>
-              <div>
-                <p className="text-white text-sm font-semibold">{f.title}</p>
-                <p className="text-white/40 text-xs mt-0.5">{f.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="text-white/20 text-xs relative z-10">© 2025 Nexios AI. All rights reserved.</p>
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'var(--bg-primary)' }}>
+      {/* bg blobs */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-20%] right-[-10%] w-[400px] h-[400px] rounded-full opacity-15"
+          style={{ background: 'radial-gradient(circle, #6366f1, transparent 70%)', filter: 'blur(60px)' }} />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[300px] h-[300px] rounded-full opacity-10"
+          style={{ background: 'radial-gradient(circle, #818cf8, transparent 70%)', filter: 'blur(50px)' }} />
+        <div className="fixed inset-0 bg-dots opacity-30" />
       </div>
 
-      {/* Right form panel */}
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-[400px]">
-          {/* Mobile logo */}
-          <div className="flex items-center gap-2.5 mb-8 lg:hidden">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #5b78ff, #8b5cf6)' }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} className="w-4.5 h-4.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <div className="w-full max-w-sm relative">
+        <Link href="/" className="inline-flex items-center gap-2 text-sm mb-8 transition-colors"
+          style={{ color: 'var(--text-muted)' }}
+          onMouseOver={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+          onMouseOut={e => (e.currentTarget.style.color = 'var(--text-muted)')}>
+          <HiArrowLeft className="w-3.5 h-3.5" /> Back to Home
+        </Link>
+
+        <div className="glass rounded-2xl p-8" style={{ boxShadow: '0 0 40px rgba(99,102,241,0.08), 0 24px 48px rgba(0,0,0,0.4)' }}>
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4"
+              style={{ background: 'linear-gradient(135deg, #6366f1, #818cf8)', boxShadow: '0 0 24px var(--accent-glow)' }}>
+              <BsRobot className="w-6 h-6 text-white" />
             </div>
-            <span className="font-bold text-lg" style={{ color: 'var(--text)' }}>Nexios AI</span>
+            <h1 className="text-xl font-bold text-white">Welcome back</h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Sign in to your Nexios account</p>
           </div>
 
-          <h2 className="text-2xl font-bold mb-1" style={{ color: 'var(--text)' }}>Welcome back</h2>
-          <p className="text-sm mb-7" style={{ color: 'var(--text2)' }}>
-            Sign in to continue.{' '}
-            <Link href="/register" className="font-semibold" style={{ color: 'var(--accent)' }}>Create account</Link>
-          </p>
-
+          {/* Success */}
           {showSuccess && (
-            <div className="mb-5 p-4 rounded-2xl flex items-center gap-3" style={{ background: 'rgba(91,120,255,0.12)', border: '1px solid rgba(91,120,255,0.3)' }}>
-              <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 shrink-0" style={{ color: 'var(--accent)' }}><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
-              <p className="text-sm font-medium" style={{ color: 'var(--accent)' }}>Login successful! Redirecting…</p>
+            <div className="mb-5 p-3.5 rounded-xl text-center text-sm font-medium"
+              style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)', color: '#34d399' }}>
+              ✓ Login successful — redirecting...
             </div>
           )}
 
+          {/* Error */}
           {error && (
-            <div className="mb-5 p-3.5 rounded-2xl flex items-start gap-2.5" style={{ background: '#ef444415', border: '1px solid #ef444440' }}>
-              <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 shrink-0 mt-0.5 text-red-400"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/></svg>
-              <p className="text-sm text-red-400">{error}</p>
+            <div className="mb-5 p-3.5 rounded-xl text-sm"
+              style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)', color: 'var(--danger)' }}>
+              {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Username / Email */}
             <div>
-              <label className="block text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: 'var(--text2)' }}>Username or Email</label>
+              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                Username or Email
+              </label>
               <div className="relative">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text3)' }}><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                <input type="text" name="identifier" value={formData.identifier} onChange={handleChange}
-                  className="input-field pl-10" placeholder="johndoe or john@example.com"
-                  disabled={isLoading || showSuccess} autoComplete="username" autoFocus />
+                <input
+                  type="text"
+                  name="identifier"
+                  value={formData.identifier}
+                  onChange={handleChange}
+                  className="input-base input-icon-right pr-10"
+                  placeholder="johndoe or john@email.com"
+                  disabled={isLoading || showSuccess}
+                  autoComplete="username"
+                />
+                <div className="absolute inset-y-0 right-3.5 flex items-center pointer-events-none">
+                  <HiUser className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                </div>
               </div>
             </div>
 
+            {/* Password */}
             <div>
-              <label className="block text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: 'var(--text2)' }}>Password</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Password</label>
+                <Link href="#" className="text-xs transition-colors" style={{ color: 'var(--accent)' }}>Forgot password?</Link>
+              </div>
               <div className="relative">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text3)' }}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                <input type={showPassword ? 'text' : 'password'} name="password" value={formData.password} onChange={handleChange}
-                  className="input-field pl-10 pr-12" placeholder="Enter your password"
-                  disabled={isLoading || showSuccess} autoComplete="current-password" />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
-                  style={{ color: 'var(--text3)' }}>
-                  <EyeIcon open={showPassword} />
-                </button>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="input-base pr-20"
+                  placeholder="••••••••"
+                  disabled={isLoading || showSuccess}
+                  autoComplete="current-password"
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center gap-2 pr-3">
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}
+                    className="transition-colors"
+                    style={{ color: 'var(--text-muted)' }}
+                    onMouseOver={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+                    onMouseOut={e => (e.currentTarget.style.color = 'var(--text-muted)')}>
+                    {showPassword ? <HiEyeOff className="w-4 h-4" /> : <HiEye className="w-4 h-4" />}
+                  </button>
+                  <HiLockClosed className="w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+                </div>
               </div>
             </div>
 
-            <button type="submit" disabled={isLoading || showSuccess}
-              className="w-full py-3 rounded-2xl font-semibold text-sm text-white transition-all flex items-center justify-center gap-2 mt-2"
-              style={{ background: isLoading || showSuccess ? 'var(--text3)' : 'linear-gradient(135deg, var(--accent), var(--accent2))', cursor: isLoading || showSuccess ? 'not-allowed' : 'pointer' }}>
-              {isLoading ? (
-                <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Signing in…</>
-              ) : 'Sign In'}
+            <button
+              type="submit"
+              disabled={isLoading || showSuccess}
+              className="w-full btn-primary py-3 text-sm font-semibold mt-2"
+              style={{ opacity: isLoading || showSuccess ? 0.6 : 1, cursor: isLoading || showSuccess ? 'not-allowed' : 'pointer' }}>
+              {isLoading
+                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Signing in...</>
+                : <>Sign In <HiArrowRight className="w-4 h-4" /></>}
             </button>
           </form>
 
-          <div className="flex items-center justify-center gap-4 mt-7">
-            <div className="flex items-center gap-1.5">
-              <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5" style={{ color: 'var(--text3)' }}><path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
-              <span className="text-xs" style={{ color: 'var(--text3)' }}>Enterprise Security</span>
-            </div>
-            <div className="w-px h-3" style={{ background: 'var(--border)' }} />
-            <div className="flex items-center gap-1.5">
-              <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5" style={{ color: 'var(--text3)' }}><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>
-              <span className="text-xs" style={{ color: 'var(--text3)' }}>256-bit Encryption</span>
-            </div>
+          <p className="text-center mt-6 text-sm" style={{ color: 'var(--text-muted)' }}>
+            No account?{' '}
+            <Link href="/register" className="font-semibold transition-colors" style={{ color: 'var(--accent)' }}>Create one free</Link>
+          </p>
+        </div>
+
+        {/* Trust */}
+        <div className="flex items-center justify-center gap-5 mt-5">
+          <div className="flex items-center gap-1.5">
+            <HiShieldCheck className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>End-to-end encrypted</span>
+          </div>
+          <div className="w-px h-4" style={{ background: 'var(--glass-border)' }} />
+          <div className="flex items-center gap-1.5">
+            <HiLockClosed className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>256-bit AES</span>
           </div>
         </div>
       </div>
@@ -187,7 +188,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
         <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)' }} />
       </div>
     }>
