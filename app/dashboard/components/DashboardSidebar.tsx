@@ -59,34 +59,39 @@ export default function DashboardSidebar({ isOpen, user, isMobileOpen, onMobileC
 
   return (
     <>
+      {/* Mobile overlay */}
       {isMobileOpen && (
-        <div className="fixed inset-0 z-30 md:hidden" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
-          onClick={onMobileClose} />
+        <div
+          className="fixed inset-0 z-30 md:hidden"
+          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+          onClick={onMobileClose}
+        />
       )}
 
-      <aside className={`fixed top-0 left-0 h-full z-40 flex flex-col transition-all duration-300
-          ${isOpen ? 'w-60' : 'w-[72px]'}
-          ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      <aside
+        className={`fixed top-0 left-0 h-full z-40 flex flex-col transition-all duration-300 w-60
+          ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
+          ${isOpen ? 'md:translate-x-0' : 'md:-translate-x-full'}
         `}
-        style={{ background: 'var(--bg-secondary)', backdropFilter: 'blur(24px)', borderRight: '1px solid var(--glass-border)' }}>
-
+        style={{
+          background: 'var(--bg-secondary)',
+          backdropFilter: 'blur(24px)',
+          borderRight: '1px solid var(--glass-border)',
+        }}
+      >
         {/* Logo */}
         <div className="h-14 flex items-center px-4 shrink-0" style={{ borderBottom: '1px solid var(--glass-border)' }}>
           <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--accent)', boxShadow: '0 0 12px var(--accent-glow)' }}>
             <BsRobot className="w-4 h-4 text-white" />
           </div>
-          {isOpen && (
-            <span className="ml-2.5 text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
-              Nexios<span style={{ color: 'var(--accent)' }}>AI</span>
-            </span>
-          )}
+          <span className="ml-2.5 text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+            Nexios<span style={{ color: 'var(--accent)' }}>AI</span>
+          </span>
         </div>
 
         {/* Nav */}
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-          {isOpen && (
-            <p className="text-[10px] font-semibold uppercase tracking-widest px-3 pb-2 pt-1" style={{ color: 'var(--text-muted)' }}>Menu</p>
-          )}
+          <p className="text-[10px] font-semibold uppercase tracking-widest px-3 pb-2 pt-1" style={{ color: 'var(--text-muted)' }}>Menu</p>
           {NAV.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href, item.exact);
@@ -106,19 +111,11 @@ export default function DashboardSidebar({ isOpen, user, isMobileOpen, onMobileC
               >
                 {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full" style={{ background: 'var(--accent)' }} />}
                 <Icon className="w-4 h-4 shrink-0" />
-                {isOpen && (
-                  <span className="text-sm font-medium truncate flex-1">{item.label}</span>
-                )}
-                {isOpen && item.badge && (
+                <span className="text-sm font-medium truncate flex-1">{item.label}</span>
+                {item.badge && (
                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}>
                     {item.badge}
                   </span>
-                )}
-                {!isOpen && (
-                  <div className="absolute left-full ml-3 px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50"
-                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', boxShadow: 'var(--shadow-md)' }}>
-                    {item.label}
-                  </div>
                 )}
               </Link>
             );
@@ -133,12 +130,10 @@ export default function DashboardSidebar({ isOpen, user, isMobileOpen, onMobileC
                 style={{ background: 'linear-gradient(135deg, #6366f1, #818cf8)' }}>
                 {user.fullName?.[0]?.toUpperCase() || 'U'}
               </div>
-              {isOpen && (
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{user.fullName}</p>
-                  <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{user.email}</p>
-                </div>
-              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{user.fullName}</p>
+                <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{user.email}</p>
+              </div>
             </div>
           </div>
         )}
