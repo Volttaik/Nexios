@@ -280,7 +280,7 @@ export default function Home() {
                       </div>
                       <div className="p-4 font-code text-xs leading-loose">
                         <div><span style={{ color: '#818cf8' }}>const</span> <span style={{ color: '#60a5fa' }}>server</span> = <span style={{ color: '#f59e0b' }}>express</span>()</div>
-                        <div><span style={{ color: '#94a3b8' }}>// AI wrote this for you</span></div>
+                        <div><span style={{ color: '#94a3b8' }}>{'// AI wrote this for you'}</span></div>
                         <div><span style={{ color: '#60a5fa' }}>server</span>.<span style={{ color: '#34d399' }}>listen</span>(<span style={{ color: '#fbbf24' }}>3000</span>)</div>
                       </div>
                     </div>
@@ -316,7 +316,7 @@ export default function Home() {
                   <div className="space-y-3">
                     <div className="rounded-xl p-4" style={{ background: 'rgba(244,114,182,0.05)', border: '1px solid rgba(244,114,182,0.15)' }}>
                       <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>User said:</p>
-                      <p className="text-sm text-white mb-3">"Build me a dark pricing page with 3 tiers"</p>
+                      <p className="text-sm text-white mb-3">&quot;Build me a dark pricing page with 3 tiers&quot;</p>
                       <div className="h-px mb-3" style={{ background: 'rgba(244,114,182,0.1)' }} />
                       <p className="text-xs mb-1" style={{ color: '#f472b6' }}>AI generated:</p>
                       <div className="flex gap-1.5">
