@@ -1,15 +1,15 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState, useRef } from 'react';
+import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import {
-  BsRobot, BsTerminal, BsGithub, BsGlobe,
+  BsRobot, BsGlobe,
   BsFileCode, BsFolder, BsFolder2Open, BsPlus, BsTrash3,
-  BsChevronDown, BsChevronRight, BsArrowUpRight,
+  BsChevronDown, BsChevronRight,
   BsFileEarmarkCode, BsFileEarmark, BsFileEarmarkText, BsSearch,
-  BsDownload, BsCheckCircle, BsCpuFill, BsLightningChargeFill,
-  BsShieldCheck, BsPeopleFill, BsLayoutTextWindowReverse,
+  BsDownload, BsCpuFill, BsLightningChargeFill,
+  BsShieldCheck, BsPeopleFill,
   BsFileEarmarkRichtext, BsBrush
 } from 'react-icons/bs';
 import {
@@ -246,7 +246,7 @@ function FileTree({ nodes, onSelect, selectedPath, onDelete, onRename, onAdd, ex
 }
 
 // ─────────────────────────── Agent Status Badge ───────────────────────────
-function AgentBadge({ id, status, name, color, icon: Icon }: { id: number; status: string; name: string; color: string; icon: any }) {
+function AgentBadge({ status, name, color, icon: Icon }: { id?: number; status: string; name: string; color: string; icon: any }) {
   const isWorking = status === 'working';
   const isDone = status === 'done';
   return (
@@ -267,7 +267,6 @@ type ContentTab = 'code' | 'files' | 'design' | 'document';
 
 export default function ProjectWorkspace() {
   const params = useParams();
-  const router = useRouter();
   const id = params?.id as string;
 
   const { activeProvider, activeModel, getApiKey, setActiveModel, setActiveProvider } = useAI();
