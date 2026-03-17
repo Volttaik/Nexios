@@ -8,6 +8,7 @@ export interface AIModel {
   description: string;
   supportsImages: boolean;
   supportsCode: boolean;
+  free?: boolean;
 }
 
 export interface AIProvider {
@@ -19,6 +20,8 @@ export interface AIProvider {
   apiKeyPlaceholder: string;
   models: AIModel[];
   icon: string;
+  isFree?: boolean;
+  freeNote?: string;
 }
 
 export const AI_PROVIDERS: AIProvider[] = [
@@ -32,8 +35,27 @@ export const AI_PROVIDERS: AIProvider[] = [
     icon: 'G',
     models: [
       { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Fastest, multimodal', supportsImages: true, supportsCode: true },
+      { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite', description: 'Ultra-fast, free tier', supportsImages: true, supportsCode: true, free: true },
       { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Fast & efficient', supportsImages: true, supportsCode: true },
       { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', description: 'Most capable', supportsImages: true, supportsCode: true },
+    ],
+  },
+  {
+    id: 'groq',
+    name: 'Groq (Free)',
+    shortName: 'Groq',
+    color: '#F55036',
+    bgGradient: 'from-red-500 to-orange-500',
+    apiKeyPlaceholder: 'gsk_...',
+    icon: 'Gq',
+    isFree: true,
+    freeNote: 'Free tier with generous limits — get key at console.groq.com',
+    models: [
+      { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B', description: 'Most capable Llama', supportsImages: false, supportsCode: true, free: true },
+      { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B', description: 'Ultra-fast responses', supportsImages: false, supportsCode: true, free: true },
+      { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B', description: 'Great for reasoning', supportsImages: false, supportsCode: true, free: true },
+      { id: 'gemma2-9b-it', name: 'Gemma 2 9B', description: "Google's open model", supportsImages: false, supportsCode: true, free: true },
+      { id: 'llama-3.2-11b-vision-preview', name: 'Llama 3.2 11B Vision', description: 'Vision capable', supportsImages: true, supportsCode: true, free: true },
     ],
   },
   {
@@ -43,10 +65,11 @@ export const AI_PROVIDERS: AIProvider[] = [
     color: '#10A37F',
     bgGradient: 'from-emerald-500 to-teal-500',
     apiKeyPlaceholder: 'sk-...',
-    icon: 'AI',
+    icon: 'OA',
     models: [
-      { id: 'gpt-4o', name: 'GPT-4o', description: 'Most capable', supportsImages: true, supportsCode: true },
+      { id: 'gpt-4o', name: 'GPT-4o', description: 'Most capable, multimodal', supportsImages: true, supportsCode: true },
       { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: 'Fast & affordable', supportsImages: true, supportsCode: true },
+      { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', description: 'Powerful & fast', supportsImages: true, supportsCode: true },
       { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'Fast & cheap', supportsImages: false, supportsCode: true },
     ],
   },
@@ -60,7 +83,8 @@ export const AI_PROVIDERS: AIProvider[] = [
     icon: 'Cl',
     models: [
       { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', description: 'Best intelligence', supportsImages: true, supportsCode: true },
-      { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', description: 'Fast & light', supportsImages: true, supportsCode: true },
+      { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', description: 'Fast & efficient', supportsImages: true, supportsCode: true },
+      { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', description: 'Lightweight', supportsImages: true, supportsCode: true },
     ],
   },
   {
@@ -74,6 +98,7 @@ export const AI_PROVIDERS: AIProvider[] = [
     models: [
       { id: 'mistral-large-latest', name: 'Mistral Large', description: 'Most powerful', supportsImages: false, supportsCode: true },
       { id: 'mistral-small-latest', name: 'Mistral Small', description: 'Fast & efficient', supportsImages: false, supportsCode: true },
+      { id: 'codestral-latest', name: 'Codestral', description: 'Code specialist', supportsImages: false, supportsCode: true },
     ],
   },
 ];
@@ -93,6 +118,7 @@ const DEFAULT_SETTINGS: AISettings = {
   activeProvider: 'gemini',
   providers: {
     gemini: { apiKey: '', selectedModel: 'gemini-2.0-flash', enabled: true },
+    groq: { apiKey: '', selectedModel: 'llama-3.3-70b-versatile', enabled: false },
     openai: { apiKey: '', selectedModel: 'gpt-4o', enabled: false },
     anthropic: { apiKey: '', selectedModel: 'claude-3-5-sonnet-20241022', enabled: false },
     mistral: { apiKey: '', selectedModel: 'mistral-large-latest', enabled: false },
@@ -108,27 +134,29 @@ interface AIContextType {
   setActiveProvider: (providerId: string) => void;
   setActiveModel: (modelId: string) => void;
   getApiKey: (providerId: string) => string;
+  quotaError: string | null;
+  setQuotaError: (err: string | null) => void;
 }
 
 const AIContext = createContext<AIContextType>({} as AIContextType);
 
 export function AIProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AISettings>(DEFAULT_SETTINGS);
+  const [quotaError, setQuotaError] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('nexios-ai-settings');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setSettings({ ...DEFAULT_SETTINGS, ...parsed, providers: { ...DEFAULT_SETTINGS.providers, ...parsed.providers } });
+        setSettings({
+          ...DEFAULT_SETTINGS,
+          ...parsed,
+          providers: { ...DEFAULT_SETTINGS.providers, ...parsed.providers },
+        });
       } catch { /* ignore */ }
     }
   }, []);
-
-  const saveSettings = (s: AISettings) => {
-    setSettings(s);
-    localStorage.setItem('nexios-ai-settings', JSON.stringify(s));
-  };
 
   const updateSettings = useCallback((partial: Partial<AISettings>) => {
     setSettings(prev => {
@@ -140,7 +168,10 @@ export function AIProvider({ children }: { children: ReactNode }) {
 
   const updateProviderConfig = useCallback((providerId: string, config: Partial<AIProviderConfig>) => {
     setSettings(prev => {
-      const next = { ...prev, providers: { ...prev.providers, [providerId]: { ...prev.providers[providerId], ...config } } };
+      const next = {
+        ...prev,
+        providers: { ...prev.providers, [providerId]: { ...prev.providers[providerId], ...config } },
+      };
       localStorage.setItem('nexios-ai-settings', JSON.stringify(next));
       return next;
     });
@@ -148,15 +179,29 @@ export function AIProvider({ children }: { children: ReactNode }) {
 
   const setActiveProvider = useCallback((providerId: string) => {
     setSettings(prev => {
-      const next = { ...prev, activeProvider: providerId, providers: { ...prev.providers, [providerId]: { ...prev.providers[providerId], enabled: true } } };
+      const next = {
+        ...prev,
+        activeProvider: providerId,
+        providers: {
+          ...prev.providers,
+          [providerId]: { ...prev.providers[providerId], enabled: true },
+        },
+      };
       localStorage.setItem('nexios-ai-settings', JSON.stringify(next));
       return next;
     });
+    setQuotaError(null);
   }, []);
 
   const setActiveModel = useCallback((modelId: string) => {
     setSettings(prev => {
-      const next = { ...prev, providers: { ...prev.providers, [prev.activeProvider]: { ...prev.providers[prev.activeProvider], selectedModel: modelId } } };
+      const next = {
+        ...prev,
+        providers: {
+          ...prev.providers,
+          [prev.activeProvider]: { ...prev.providers[prev.activeProvider], selectedModel: modelId },
+        },
+      };
       localStorage.setItem('nexios-ai-settings', JSON.stringify(next));
       return next;
     });
@@ -175,7 +220,11 @@ export function AIProvider({ children }: { children: ReactNode }) {
   const activeModel = activeProvider.models.find(m => m.id === activeProviderConfig.selectedModel) || activeProvider.models[0];
 
   return (
-    <AIContext.Provider value={{ settings, activeProvider, activeModel, updateSettings, updateProviderConfig, setActiveProvider, setActiveModel, getApiKey }}>
+    <AIContext.Provider value={{
+      settings, activeProvider, activeModel,
+      updateSettings, updateProviderConfig, setActiveProvider, setActiveModel, getApiKey,
+      quotaError, setQuotaError,
+    }}>
       {children}
     </AIContext.Provider>
   );

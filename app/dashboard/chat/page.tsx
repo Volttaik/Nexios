@@ -8,22 +8,16 @@ import { useAI } from '@/app/context/AIContext';
 import { callAI, type ChatMessage } from '@/app/lib/ai';
 
 interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'ai';
-  timestamp: Date;
-  imageUrls?: string[];
-  provider?: string;
-  model?: string;
+  id: string; text: string; sender: 'user' | 'ai';
+  timestamp: Date; imageUrls?: string[]; provider?: string; model?: string;
 }
 
-
-/* ── Icons ────────────────────────────────────────────────────────────────── */
-const SendIcon = () => <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>;
-const ImageIcon = () => <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" /></svg>;
-const CopyIcon = () => <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>;
-const CheckIcon = () => <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>;
-const BotIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><line x1="12" y1="7" x2="12" y2="11"/><circle cx="8.5" cy="15" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15" r="1" fill="currentColor" stroke="none"/></svg>;
+const SendIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>;
+const ImageIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>;
+const CopyIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>;
+const CheckIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-3.5 h-3.5"><polyline points="20 6 9 17 4 12"/></svg>;
+const BotIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><line x1="12" y1="7" x2="12" y2="11"/><circle cx="8.5" cy="15.5" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1" fill="currentColor" stroke="none"/></svg>;
+const XIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-3.5 h-3.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 
 function renderMarkdown(text: string) {
   const parts = text.split(/(```[\s\S]*?```|`[^`]+`)/g);
@@ -32,22 +26,48 @@ function renderMarkdown(text: string) {
   for (const part of parts) {
     if (part.startsWith('```')) {
       const lines = part.split('\n');
-      const _lang = lines[0].replace('```', '').trim(); void _lang;
+      const lang = lines[0].replace('```', '').trim();
       const code = lines.slice(1, -1).join('\n');
-      elements.push(<pre key={key++} className="my-2 rounded-xl overflow-x-auto text-xs leading-relaxed p-4 font-mono" style={{ background: '#1e1e2e', color: '#a6e3a1' }}><code>{code}</code></pre>);
+      elements.push(
+        <div key={key++} className="my-3 rounded-xl overflow-hidden text-xs" style={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.08)' }}>
+          {lang && <div className="px-4 py-1.5 flex items-center justify-between" style={{ background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span className="text-[10px] font-mono font-semibold" style={{ color: 'rgba(255,255,255,0.4)' }}>{lang}</span>
+          </div>}
+          <pre className="overflow-x-auto p-4 leading-relaxed font-mono" style={{ color: '#a6e3a1', margin: 0 }}><code>{code}</code></pre>
+        </div>
+      );
     } else if (part.startsWith('`') && part.endsWith('`')) {
-      elements.push(<code key={key++} className="px-1.5 py-0.5 rounded text-[11px] font-mono" style={{ background: 'rgba(0,0,0,0.15)', color: 'inherit' }}>{part.slice(1,-1)}</code>);
+      elements.push(<code key={key++} className="px-1.5 py-0.5 rounded text-[11px] font-mono mx-0.5" style={{ background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(0,0,0,0.1)' }}>{part.slice(1, -1)}</code>);
     } else {
       const lines = part.split('\n');
       for (const line of lines) {
-        if (line.startsWith('### ')) elements.push(<h3 key={key++} className="font-bold text-sm mt-3 mb-1">{line.slice(4)}</h3>);
-        else if (line.startsWith('## ')) elements.push(<h2 key={key++} className="font-bold text-base mt-3 mb-1">{line.slice(3)}</h2>);
-        else if (line.startsWith('# ')) elements.push(<h1 key={key++} className="font-bold text-lg mt-3 mb-1">{line.slice(2)}</h1>);
-        else if (line.startsWith('- ') || line.startsWith('* ')) elements.push(<div key={key++} className="flex gap-2 my-0.5"><span className="mt-2 w-1.5 h-1.5 rounded-full bg-current shrink-0 opacity-60" /><span>{line.slice(2)}</span></div>);
-        else if (line === '') elements.push(<div key={key++} className="h-1.5" />);
+        if (line.startsWith('### ')) elements.push(<h3 key={key++} className="font-bold text-sm mt-4 mb-1.5">{line.slice(4)}</h3>);
+        else if (line.startsWith('## ')) elements.push(<h2 key={key++} className="font-bold text-base mt-4 mb-1.5">{line.slice(3)}</h2>);
+        else if (line.startsWith('# ')) elements.push(<h1 key={key++} className="font-bold text-lg mt-4 mb-1.5">{line.slice(2)}</h1>);
+        else if (line.startsWith('- ') || line.startsWith('* ')) {
+          elements.push(
+            <div key={key++} className="flex gap-2.5 my-1 items-start">
+              <span className="mt-2 w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--accent)' }} />
+              <span className="leading-relaxed">{line.slice(2)}</span>
+            </div>
+          );
+        }
+        else if (/^\d+\.\s/.test(line)) {
+          const match = line.match(/^(\d+)\.\s(.+)/);
+          if (match) elements.push(
+            <div key={key++} className="flex gap-2.5 my-1 items-start">
+              <span className="font-bold shrink-0 text-xs mt-0.5" style={{ color: 'var(--accent)' }}>{match[1]}.</span>
+              <span className="leading-relaxed">{match[2]}</span>
+            </div>
+          );
+        }
+        else if (line.startsWith('> ')) elements.push(
+          <div key={key++} className="my-2 pl-3 border-l-2 italic opacity-70" style={{ borderColor: 'var(--accent)' }}>{line.slice(2)}</div>
+        );
+        else if (line === '') elements.push(<div key={key++} className="h-2" />);
         else {
           const bold = line.split(/(\*\*[^*]+\*\*)/g);
-          elements.push(<div key={key++}>{bold.map((b, i) => b.startsWith('**') ? <strong key={i}>{b.slice(2,-2)}</strong> : <span key={i}>{b}</span>)}</div>);
+          elements.push(<div key={key++} className="leading-relaxed">{bold.map((b, i) => b.startsWith('**') ? <strong key={i}>{b.slice(2, -2)}</strong> : <span key={i}>{b}</span>)}</div>);
         }
       }
     }
@@ -56,6 +76,13 @@ function renderMarkdown(text: string) {
 }
 
 function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+const SUGGESTIONS = [
+  'Explain quantum computing simply',
+  'Write a REST API in Node.js',
+  'Debug my Python code',
+  'Create a business plan outline',
+];
 
 export default function ChatPage() {
   const { activeProvider, activeModel, getApiKey } = useAI();
@@ -109,9 +136,16 @@ export default function ChatPage() {
   useEffect(() => { if (sessions.length > 0) localStorage.setItem('chatSessions', JSON.stringify(sessions)); }, [sessions]);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isLoading]);
 
+  /* Mobile scroll lock */
+  useEffect(() => {
+    if (mobileMenuOpen) document.body.classList.add('menu-open');
+    else document.body.classList.remove('menu-open');
+    return () => document.body.classList.remove('menu-open');
+  }, [mobileMenuOpen]);
+
   const autoResize = () => {
     const el = textareaRef.current;
-    if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 150) + 'px'; }
+    if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 160) + 'px'; }
   };
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -144,13 +178,12 @@ export default function ChatPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token'); localStorage.removeItem('user'); localStorage.removeItem('chatSessions');
+    localStorage.removeItem('token'); localStorage.removeItem('user');
     window.location.href = '/login';
   };
 
   const handleSend = async () => {
     if ((!input.trim() && selectedFiles.length === 0) || isLoading) return;
-
     let sid = currentSessionId;
     if (!sid) {
       const newSession: ChatSession = { id: genId(), title: 'New Chat', messages: [], createdAt: new Date(), updatedAt: new Date(), sessionKey: genId() };
@@ -159,31 +192,23 @@ export default function ChatPage() {
       sid = newSession.id;
       await new Promise(r => setTimeout(r, 30));
     }
-
     setIsLoading(true);
-    const userMsg: Message = {
-      id: genId(), text: input, sender: 'user', timestamp: new Date(),
-      imageUrls: imagePreviews.length > 0 ? [...imagePreviews] : undefined,
-    };
+    const userMsg: Message = { id: genId(), text: input, sender: 'user', timestamp: new Date(), imageUrls: imagePreviews.length > 0 ? [...imagePreviews] : undefined };
     const currentImages = [...imagePreviews];
     const currentInput = input;
-
-    setSessions(prev => prev.map(s => s.id === sid ? { ...s, messages: [...s.messages, userMsg], updatedAt: new Date(), title: s.messages.length === 0 ? (input || 'Image chat').slice(0, 40) : s.title } : s));
+    setSessions(prev => prev.map(s => s.id === sid ? { ...s, messages: [...s.messages, userMsg], updatedAt: new Date(), title: s.messages.length === 0 ? (input || 'Image chat').slice(0, 42) : s.title } : s));
     setInput(''); setSelectedFiles([]); setImagePreviews([]);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
-
     try {
       const history: ChatMessage[] = messages.map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.text, imageBase64List: m.imageUrls }));
       const userChatMsg: ChatMessage = { role: 'user', content: currentInput, imageBase64List: currentImages.length > 0 ? currentImages : undefined };
-      const allMessages = [...history, userChatMsg];
-
       const apiKey = getApiKey(activeProvider.id);
-      const response = await callAI(activeProvider.id, activeModel.id, allMessages, apiKey);
-
+      const response = await callAI(activeProvider.id, activeModel.id, [...history, userChatMsg], apiKey);
       const aiMsg: Message = { id: genId(), text: response, sender: 'ai', timestamp: new Date(), provider: activeProvider.id, model: activeModel.id };
       setSessions(prev => prev.map(s => s.id === sid ? { ...s, messages: [...s.messages, aiMsg], updatedAt: new Date() } : s));
-    } catch {
-      const errMsg: Message = { id: genId(), text: "⚠️ An error occurred. Please check your API key in the sidebar.", sender: 'ai', timestamp: new Date() };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      const errMsg: Message = { id: genId(), text: `⚠️ Error: ${msg}`, sender: 'ai', timestamp: new Date() };
       setSessions(prev => prev.map(s => s.id === sid ? { ...s, messages: [...s.messages, errMsg] } : s));
     } finally {
       setIsLoading(false);
@@ -196,82 +221,105 @@ export default function ChatPage() {
   if (!mounted) return null;
 
   const providerColor = activeProvider.color;
-  const mlClass = sidebarOpen ? 'md:ml-72' : 'md:ml-[60px]';
+  const mlClass = sidebarOpen ? 'md:ml-72' : 'md:ml-16';
 
   return (
-    <div className="fixed inset-0 z-50 flex" style={{ background: 'var(--bg)' }}>
+    <div className="fixed inset-0 z-20 flex" style={{ background: 'var(--bg)' }}>
       <DashboardSidebar
         user={user} currentChatId={currentSessionId} onChatSelect={setCurrentSessionId}
-        onNewChat={handleNewChat} onDeleteChat={id => { setSessions(p => p.filter(s => s.id !== id)); if (currentSessionId === id) { const rem = sessions.filter(s => s.id !== id); setCurrentSessionId(rem[0]?.id || ''); } }}
+        onNewChat={handleNewChat}
+        onDeleteChat={id => { setSessions(p => p.filter(s => s.id !== id)); if (currentSessionId === id) { const rem = sessions.filter(s => s.id !== id); setCurrentSessionId(rem[0]?.id || ''); } }}
         onRenameChat={(id, t) => setSessions(p => p.map(s => s.id === id ? { ...s, title: t } : s))}
         isOpen={sidebarOpen} onToggle={() => { const n = !sidebarOpen; setSidebarOpen(n); localStorage.setItem('nexios-sidebar-open', String(n)); }}
         isMobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} onMobileOpen={() => setMobileMenuOpen(true)}
         onLogout={handleLogout}
       />
 
-      <div className={`flex flex-col h-full flex-1 transition-all duration-300 ${mlClass}`}>
-        {/* Header */}
-        <div className="h-12 flex items-center justify-between px-4 shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-bold text-white" style={{ background: providerColor }}>
-              {activeProvider.icon}
+      <div className={`flex flex-col h-full flex-1 min-w-0 transition-all duration-300 ${mlClass}`}>
+        {/* Top bar */}
+        <div className="h-12 flex items-center justify-between px-4 sm:px-5 shrink-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+          <div className="flex items-center gap-3 pl-10 md:pl-0">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold text-white shrink-0" style={{ background: providerColor }}>
+                {activeProvider.icon}
+              </div>
+              <div>
+                <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{activeProvider.shortName}</span>
+                <span className="text-xs mx-1.5" style={{ color: 'var(--text3)' }}>·</span>
+                <span className="text-xs" style={{ color: 'var(--text2)' }}>{activeModel.name}</span>
+              </div>
             </div>
-            <span className="text-xs font-semibold" style={{ color: 'var(--text2)' }}>{activeProvider.shortName} / {activeModel.name}</span>
+            {activeProvider.isFree && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: '#10b98120', color: '#10b981' }}>FREE</span>
+            )}
           </div>
-          <span className="text-xs truncate max-w-xs" style={{ color: 'var(--text3)' }}>{currentSession?.title || 'New conversation'}</span>
+          <span className="text-xs truncate max-w-[200px] sm:max-w-xs hidden sm:block" style={{ color: 'var(--text3)' }}>
+            {currentSession?.title || 'New conversation'}
+          </span>
         </div>
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 shadow-lg text-white" style={{ background: providerColor }}>
-                <span className="text-lg font-bold">{activeProvider.icon}</span>
+            <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12 max-w-2xl mx-auto w-full">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 shadow-xl"
+                style={{ background: `linear-gradient(135deg, ${providerColor}, ${providerColor}99)` }}>
+                <span className="text-2xl font-bold text-white">{activeProvider.icon}</span>
               </div>
-              <h2 className="text-xl font-bold mb-1" style={{ color: 'var(--text)' }}>How can I help you?</h2>
-              <p className="text-sm mb-8" style={{ color: 'var(--text2)' }}>Powered by {activeProvider.name} · {activeModel.name}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
-                {['Explain a concept simply', 'Write and debug code', 'Review my code for bugs', 'Help me brainstorm ideas'].map((s, i) => (
+              <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--text)' }}>How can I help you?</h2>
+              <p className="text-sm mb-8" style={{ color: 'var(--text2)' }}>
+                {activeProvider.name} · {activeModel.name}
+                {activeProvider.isFree && <span className="ml-2 text-green-500 font-medium">✓ Free</span>}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full">
+                {SUGGESTIONS.map((s, i) => (
                   <button key={i} onClick={() => { setInput(s); textareaRef.current?.focus(); }}
-                    className="text-left text-sm px-4 py-3 rounded-xl border transition-all hover:shadow-sm"
-                    style={{ background: 'var(--bg2)', borderColor: 'var(--border)', color: 'var(--text2)' }}>
+                    className="text-left text-sm px-4 py-3.5 rounded-2xl border transition-all hover:shadow-md hover:scale-[1.01] active:scale-[0.99]"
+                    style={{ background: 'var(--bg2)', borderColor: 'var(--border)', color: 'var(--text2)' }}
+                    onMouseEnter={e => { (e.currentTarget.style.borderColor = providerColor + '60'); }}
+                    onMouseLeave={e => { (e.currentTarget.style.borderColor = 'var(--border)'); }}>
                     {s}
                   </button>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+            <div className="max-w-3xl mx-auto px-4 py-6 space-y-5 w-full">
               {messages.map(msg => (
-                <div key={msg.id} className={`flex gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.sender === 'user' ? '' : 'text-white'}`}
+                <div key={msg.id} className={`flex gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'} animate-fadeIn`}>
+                  {/* Avatar */}
+                  <div className="w-8 h-8 rounded-2xl flex items-center justify-center shrink-0 shadow-sm"
                     style={{ background: msg.sender === 'user' ? 'var(--bg3)' : providerColor }}>
                     {msg.sender === 'user'
-                      ? (profilePic ? <img src={profilePic} alt="You" className="w-8 h-8 rounded-full object-cover" /> : <span className="text-xs font-bold" style={{ color: 'var(--text2)' }}>{user?.fullName?.[0]?.toUpperCase() || 'U'}</span>)
-                      : <BotIcon />
+                      ? (profilePic
+                          ? <img src={profilePic} alt="You" className="w-8 h-8 rounded-2xl object-cover" />
+                          : <span className="text-xs font-bold" style={{ color: 'var(--text2)' }}>{user?.fullName?.[0]?.toUpperCase() || 'U'}</span>)
+                      : <span className="text-white"><BotIcon /></span>
                     }
                   </div>
-                  <div className={`flex flex-col max-w-[80%] ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
+
+                  {/* Bubble */}
+                  <div className={`flex flex-col max-w-[82%] ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
                     {msg.imageUrls?.map((url, i) => (
-                      <div key={i} className="relative w-28 h-28 rounded-xl overflow-hidden mb-2 border" style={{ borderColor: 'var(--border)' }}>
-                        <Image src={url} alt="img" fill className="object-cover" />
+                      <div key={i} className="relative w-36 h-36 rounded-2xl overflow-hidden mb-2 shadow-md"
+                        style={{ border: '2px solid rgba(255,255,255,0.15)' }}>
+                        <Image src={url} alt="Attached image" fill className="object-cover" />
                       </div>
                     ))}
                     {msg.text && (
-                      <div className={`text-sm leading-relaxed rounded-2xl px-4 py-3 ${msg.sender === 'user' ? 'rounded-tr-sm text-white' : 'rounded-tl-sm'}`}
-                        style={{
-                          background: msg.sender === 'user' ? 'var(--text)' : 'var(--bg2)',
-                          color: msg.sender === 'user' ? 'var(--bg)' : 'var(--text)',
-                          border: msg.sender === 'ai' ? `1px solid var(--border)` : 'none',
-                        }}>
-                        {msg.sender === 'ai' ? renderMarkdown(msg.text) : msg.text}
+                      <div className={`text-[13.5px] leading-relaxed px-4 py-3 shadow-sm ${msg.sender === 'user' ? 'bubble-user' : 'bubble-ai'}`}>
+                        {msg.sender === 'ai' ? renderMarkdown(msg.text) : <span style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</span>}
                       </div>
                     )}
-                    <div className={`flex items-center gap-1.5 mt-1 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+                    <div className={`flex items-center gap-1.5 mt-1.5 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
                       <span className="text-[10px]" style={{ color: 'var(--text3)' }}>{formatTime(msg.timestamp)}</span>
                       {msg.sender === 'ai' && (
                         <>
-                          <button onClick={() => copyText(msg.text, msg.id)} className="p-1 rounded transition-colors" style={{ color: 'var(--text3)' }} title="Copy">
+                          <button onClick={() => copyText(msg.text, msg.id)} title="Copy"
+                            className="p-1 rounded-lg transition-colors"
+                            style={{ color: 'var(--text3)' }}
+                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text)')}
+                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text3)')}>
                             {copiedId === msg.id ? <CheckIcon /> : <CopyIcon />}
                           </button>
                           {msg.provider && (
@@ -285,12 +333,19 @@ export default function ChatPage() {
                   </div>
                 </div>
               ))}
+
+              {/* Loading dots */}
               {isLoading && (
-                <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white" style={{ background: providerColor }}><BotIcon /></div>
-                  <div className="px-4 py-3 rounded-2xl rounded-tl-sm border" style={{ background: 'var(--bg2)', borderColor: 'var(--border)' }}>
-                    <div className="flex gap-1 items-center">
-                      {[0,1,2].map(i => <span key={i} className="w-2 h-2 rounded-full animate-bounce-dot" style={{ background: 'var(--text3)', animationDelay: `${i*150}ms` }} />)}
+                <div className="flex gap-3 animate-fadeIn">
+                  <div className="w-8 h-8 rounded-2xl flex items-center justify-center shrink-0 text-white shadow-sm" style={{ background: providerColor }}>
+                    <BotIcon />
+                  </div>
+                  <div className="bubble-ai px-4 py-3">
+                    <div className="flex gap-1.5 items-center h-4">
+                      {[0, 1, 2].map(i => (
+                        <span key={i} className="w-2 h-2 rounded-full animate-bounce-dot"
+                          style={{ background: 'var(--text3)', animationDelay: `${i * 150}ms` }} />
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -300,24 +355,34 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* Input */}
-        <div className="shrink-0 px-4 pb-4 pt-2" style={{ borderTop: '1px solid var(--border)', background: 'var(--bg)' }}>
+        {/* Input area */}
+        <div className="shrink-0 px-4 pb-4 pt-3" style={{ borderTop: '1px solid var(--border)', background: 'var(--bg)' }}>
+          {/* Image previews */}
           {imagePreviews.length > 0 && (
-            <div className="flex gap-2 mb-2 max-w-3xl mx-auto flex-wrap">
+            <div className="flex gap-2 mb-3 max-w-3xl mx-auto flex-wrap">
               {imagePreviews.map((p, i) => (
-                <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden group border" style={{ borderColor: 'var(--border)' }}>
+                <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden group shadow-sm" style={{ border: '1.5px solid var(--border)' }}>
                   <Image src={p} alt="Preview" fill className="object-cover" />
-                  <button onClick={() => removeImage(i)} className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-white"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                  <button onClick={() => removeImage(i)}
+                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                    <XIcon />
                   </button>
                 </div>
               ))}
             </div>
           )}
           <div className="max-w-3xl mx-auto">
-            <div className="flex items-end gap-2 rounded-2xl px-3 py-2.5 shadow-sm transition-all border" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+            <div className="flex items-end gap-2 px-3.5 py-2.5 rounded-2xl border transition-all shadow-sm"
+              style={{ background: 'var(--bg2)', borderColor: 'var(--border)' }}
+              onFocusCapture={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+              onBlurCapture={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
               {activeModel.supportsImages && (
-                <button onClick={() => fileInputRef.current?.click()} className="p-1.5 rounded-lg transition-colors shrink-0 mb-0.5" style={{ color: 'var(--text3)' }} title="Attach image">
+                <button onClick={() => fileInputRef.current?.click()}
+                  className="p-1.5 rounded-xl transition-colors shrink-0 mb-0.5"
+                  style={{ color: 'var(--text3)' }}
+                  title="Attach image"
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text3)')}>
                   <ImageIcon />
                 </button>
               )}
@@ -326,17 +391,25 @@ export default function ChatPage() {
                 onChange={e => { setInput(e.target.value); autoResize(); }}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                 placeholder={`Message ${activeProvider.shortName}…`}
-                rows={1} className="flex-1 text-sm outline-none resize-none leading-relaxed py-0.5 bg-transparent"
-                style={{ color: 'var(--text)', minHeight: 22, maxHeight: 150 }}
+                rows={1} className="flex-1 text-sm outline-none resize-none leading-relaxed py-1 bg-transparent"
+                style={{ color: 'var(--text)', minHeight: 24, maxHeight: 160 }}
               />
-              <button onClick={handleSend} disabled={(!input.trim() && selectedFiles.length === 0) || isLoading}
-                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all shrink-0 text-white ${(!input.trim() && selectedFiles.length === 0) || isLoading ? 'opacity-30 cursor-not-allowed' : 'hover:opacity-80 active:scale-95'}`}
-                style={{ background: 'var(--text)' }}>
-                {isLoading ? <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin opacity-60" /> : <SendIcon />}
+              <button onClick={handleSend}
+                disabled={(!input.trim() && selectedFiles.length === 0) || isLoading}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-white transition-all shrink-0"
+                style={{
+                  background: (!input.trim() && selectedFiles.length === 0) || isLoading
+                    ? 'var(--text3)'
+                    : `linear-gradient(135deg, var(--accent), var(--accent2))`,
+                  cursor: (!input.trim() && selectedFiles.length === 0) || isLoading ? 'not-allowed' : 'pointer',
+                }}>
+                {isLoading
+                  ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  : <SendIcon />}
               </button>
             </div>
             <p className="text-center text-[10px] mt-1.5" style={{ color: 'var(--text3)' }}>
-              {activeProvider.shortName} / {activeModel.name} · Shift+Enter for newline
+              {activeProvider.shortName} · {activeModel.name} · Shift+Enter for newline
             </p>
           </div>
         </div>

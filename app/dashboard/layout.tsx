@@ -25,6 +25,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (saved !== null) setIsSidebarOpen(saved === 'true');
   }, []);
 
+  /* Lock body scroll when mobile menu is open */
+  useEffect(() => {
+    if (isMobileOpen) {
+      document.body.classList.add('menu-open');
+    } else {
+      document.body.classList.remove('menu-open');
+    }
+    return () => document.body.classList.remove('menu-open');
+  }, [isMobileOpen]);
+
   const handleToggle = () => {
     const next = !isSidebarOpen;
     setIsSidebarOpen(next);
@@ -42,10 +52,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     window.location.href = '/login';
   };
 
+  const handleMobileOpen = () => setIsMobileOpen(true);
+  const handleMobileClose = () => setIsMobileOpen(false);
+
   /* Chat and sandbox pages handle their own full-screen layout */
   if (isChatPage || isSandboxPage) return <>{children}</>;
 
-  const ml = isSidebarOpen ? 'md:ml-72' : 'md:ml-[60px]';
+  const ml = isSidebarOpen ? 'md:ml-72' : 'md:ml-[64px]';
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
@@ -57,12 +70,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         isOpen={isSidebarOpen}
         onToggle={handleToggle}
         isMobileOpen={isMobileOpen}
-        onMobileClose={() => setIsMobileOpen(false)}
-        onMobileOpen={() => setIsMobileOpen(true)}
+        onMobileClose={handleMobileClose}
+        onMobileOpen={handleMobileOpen}
         onLogout={handleLogout}
       />
       <div className={`transition-all duration-300 ${ml} min-h-screen flex flex-col`}>
-        <main className="flex-1 p-6 max-w-7xl">
+        <main className="flex-1 p-4 sm:p-6 max-w-7xl">
           {children}
         </main>
       </div>

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Nexios AI is a Next.js 15 enterprise AI platform with MongoDB/JWT authentication, a Gemini-powered chat interface, and a full dashboard. Built with glass-morphism UI, dark sidebar, model selection, and profile picture support.
+Nexios AI is a Next.js 15 enterprise AI platform with MongoDB/JWT authentication, a multi-provider AI chat interface, VS Code-like code sandbox, and a full dashboard. Features Glass UI / Soft UI / Flat UI customization, background patterns, dark/light mode, and AI support for Gemini, Groq (free), OpenAI, Anthropic, and Mistral.
 
 ## User Preferences
 
@@ -13,94 +13,97 @@ Preferred communication style: Simple, everyday language.
 ### Tech Stack
 
 - **Framework**: Next.js 15 (App Router)
-- **Styling**: Tailwind CSS v4
+- **Styling**: Tailwind CSS v4 + custom CSS variables (glass/soft/flat UI)
 - **Database**: MongoDB (via Mongoose)
 - **Auth**: JWT tokens (jsonwebtoken + jose), bcryptjs for password hashing
-- **AI**: Google Gemini API (`@google/genai`) — models: `gemini-2.0-flash`, `gemini-1.5-flash`, `gemini-1.5-pro`
-- **Icons**: React Icons (hi/bs) + inline SVGs (sidebar/chat use pure SVG)
+- **AI**: Multi-provider: Google Gemini (`@google/genai`), Groq (OpenAI-compat), OpenAI, Anthropic, Mistral
+- **Icons**: Inline SVGs throughout (no react-icons in dashboard/chat)
 - **Language**: TypeScript
+
+### Key Features (Post-Overhaul)
+
+1. **Multi-provider AI**: Gemini, Groq (FREE — Llama 3.3, Mixtral, Gemma), OpenAI, Anthropic, Mistral
+2. **Glass UI / Soft UI / Flat UI**: Toggle via Settings → Appearance
+3. **Background Patterns**: None, Dots, Grid, Lines, Noise, Circuit
+4. **Redesigned Sidebar**: Always-dark (#07070a), collapsible, mobile-friendly with scroll lock
+5. **Chat Bubbles**: Gradient user bubbles (accent → accent2), card AI bubbles with rounded corners
+6. **AI Image Support**: Upload images to vision-capable models (Gemini, GPT-4o, Claude, Llama Vision)
+7. **Groq Free Fallback**: Automatically suggested when quota exceeded for paid providers
+8. **Login/Register**: Split-panel design, dark decorative left pane, clean form right pane
+9. **Projects**: Import files/JSON, search, VS Code-like sandbox
+10. **Mobile responsive**: Scroll lock on menu open, X button to close, menu button hides when sidebar open
 
 ### Project Structure
 
 ```
 app/
+  layout.tsx               — Root layout with inline theme script (no flash)
+  globals.css              — Full design system: tokens, glass/soft/flat, patterns, animations
+  context/
+    ThemeContext.tsx        — theme (dark/light), uiStyle (flat/glass/soft), bgPattern
+    AIContext.tsx           — Multi-provider config: Gemini, Groq, OpenAI, Anthropic, Mistral
+  lib/
+    ai.ts                  — callAI() dispatcher for all 5 providers, quota error messages
+    mongodb.ts             — Mongoose connection helper
+    tokenUtils.ts          — JWT verify + URL token utilities
   api/
     login/route.ts         — POST /api/login
     register/route.ts      — POST /api/register
-    upload/route.ts        — POST /api/upload (image uploads)
+    upload/route.ts        — POST /api/upload
   components/
     Header.tsx             — Top navigation bar (public pages)
-    MenuDropdown.tsx       — Navigation dropdown menu
   dashboard/
-    layout.tsx             — Protected dashboard layout (auth check + sidebar offset)
+    layout.tsx             — Protected dashboard layout (body scroll lock, sidebar integration)
     page.tsx               — Dashboard overview
-    chat/page.tsx          — AI chat (full-screen, fixed overlay, bypasses layout sidebar)
-    analytics/page.tsx     — Usage analytics (sessions, messages, tokens, model usage)
-    documents/page.tsx     — Chat history as documents (searchable, filterable)
-    settings/page.tsx      — Settings (model, profile pic, preferences, danger zone)
-    profile/page.tsx       — User profile (account details + usage stats)
+    chat/page.tsx          — AI chat (full-screen, fixed overlay, gradient bubbles)
+    analytics/page.tsx     — Usage analytics
+    documents/page.tsx     — Chat history as documents
+    settings/page.tsx      — Settings: API keys, UI style, bg patterns, danger zone
+    projects/page.tsx      — Projects grid: create, import (file/JSON), search, VS Code sandbox
     components/
-      DashboardHeader.tsx  — Dashboard top bar (header for non-chat pages)
-      DashboardSidebar.tsx — Dark charcoal sidebar; exports AI_MODELS and ChatSession type
-      UserDropdown.tsx     — User profile dropdown
-  lib/
-    mongodb.ts             — Mongoose connection helper (cached)
-    tokenUtils.ts          — JWT verify + URL token utilities
+      DashboardSidebar.tsx — Full sidebar: nav, AI model picker, projects, chats, user menu
+  login/page.tsx           — Split-panel login: dark features left, clean form right
+  register/page.tsx        — Split-panel register with all fields
   models/
     user.ts                — Mongoose User schema
-  types/
-    user.ts                — AppUser interface (_id, id, fullName, username, email, etc.)
-  login/page.tsx           — Login page (normalizes id → _id on save)
-  register/page.tsx        — Register page (normalizes id → _id on save)
-  page.tsx                 — Landing/home page (auto-redirects logged-in users to /dashboard/chat)
-  layout.tsx               — Root layout
-  globals.css              — Global styles + Tailwind
 ```
 
-### Key Design Decisions
+### CSS Variable System
 
-- **Chat page** uses `fixed inset-0 z-50` to cover the full screen (bypasses dashboard layout)
-- **Sidebar** is dark charcoal `#111113` with glass-morphism dropdowns
-- **AI_MODELS** is exported from `DashboardSidebar.tsx` and shared by chat + settings pages
-- **Profile picture** stored as base64 in `localStorage.profilePicture`; also inside `localStorage.user.profilePicture`
-- **Selected model** persisted in `localStorage.selectedModel`
-- **Chat sessions** persisted in `localStorage.chatSessions`
-
-### Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `MONGODB_URI` | MongoDB connection string | Yes (for auth API) |
-| `JWT_SECRET` | Secret for signing JWT tokens | Yes (auto-generated) |
-| `NEXT_PUBLIC_GEMINI_API_KEY` | Gemini API key for AI chat | Yes (for AI features) |
-
-### Authentication Flow
-
-1. User registers at `/register` → POST `/api/register` → stores hashed password in MongoDB → returns JWT + user (with `id`)
-2. User logs in at `/login` → POST `/api/login` → verifies password → returns JWT + user
-3. Frontend normalizes `user.id` → `user._id` before storing in localStorage
-4. JWT stored in `localStorage.token` and as a cookie `auth_token`
-5. Dashboard layout checks `localStorage` for token; redirects to `/login` if absent
-
-### Gemini API Usage
-
-```ts
-const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY });
-const response = await ai.models.generateContent({
-  model: 'gemini-2.0-flash',  // or gemini-1.5-flash / gemini-1.5-pro
-  contents: [{ role: 'user', parts: [{ text: prompt }, ...imageInlineData] }],
-});
-const text = response.text;
+```
+:root (light):  --bg, --bg2, --bg3, --border, --text, --text2, --text3, --accent, --accent2
+.dark:          same tokens with dark values
+.ui-glass:      frosted glass overrides (backdrop-filter blur)
+.ui-soft:       neumorphic shadow overrides
+.pattern-*:     background-image patterns (dots, grid, lines, noise, circuit)
 ```
 
-### Running the App
+### AI Providers
 
-- **Dev server**: `npm run dev` (runs on port 5000, bound to 0.0.0.0 for Replit compatibility)
-- **Prod server**: `npm run start` (runs on port 5000, bound to 0.0.0.0)
-- **Workflow**: "Start application" — configured to auto-start with `npm run dev`
+| Provider  | ID         | Free?  | Models                              |
+|-----------|------------|--------|-------------------------------------|
+| Gemini    | gemini     | Partial| 2.0 Flash, 1.5 Flash, 1.5 Pro       |
+| Groq      | groq       | YES    | Llama 3.3 70B, Llama 3.1 8B, Mixtral, Gemma2, Llama Vision |
+| OpenAI    | openai     | No     | GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 |
+| Anthropic | anthropic  | No     | Claude 3.5 Sonnet, 3.5 Haiku, 3 Haiku |
+| Mistral   | mistral    | No     | Mistral Large, Small, Codestral    |
 
-### Known Notes
+### Chat Bubble Design
 
-- The app's UI works without MongoDB; auth endpoints fail gracefully with a clear error if `MONGODB_URI` is not set
-- `JWT_SECRET` is auto-generated and stored as an env var on first setup
-- Gemini chat requires `NEXT_PUBLIC_GEMINI_API_KEY` — without it, AI responses show a configuration message
+- **User**: `linear-gradient(135deg, var(--accent), var(--accent2))` with `border-radius: 20px 20px 4px 20px`
+- **AI**: `var(--bg2)` + border with `border-radius: 4px 20px 20px 20px`
+
+### Mobile Sidebar
+
+- Toggle button visible when closed, hidden when open
+- X button appears inside the sidebar panel to close
+- Body scroll locked via `document.body.classList.add('menu-open')` → `overflow: hidden`
+- Mobile overlay dims background with blur
+
+## Running the App
+
+```bash
+npm run dev
+```
+
+Runs on port 5000. JWT secret and MongoDB URI set in `.env` or Replit Secrets.

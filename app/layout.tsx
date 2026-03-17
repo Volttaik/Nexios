@@ -12,9 +12,29 @@ export const metadata: Metadata = {
   description: "Your intelligent AI development environment",
 };
 
+const themeScript = `
+(function() {
+  try {
+    var theme = localStorage.getItem('nexios-theme');
+    if (!theme) theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    var style = localStorage.getItem('nexios-ui-style') || 'flat';
+    document.documentElement.classList.add('ui-' + style);
+    var pattern = localStorage.getItem('nexios-bg-pattern');
+    if (pattern && pattern !== 'none') document.documentElement.classList.add('pattern-' + pattern);
+  } catch(e) {
+    document.documentElement.classList.add('dark');
+    document.documentElement.classList.add('ui-flat');
+  }
+})();
+`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider>
           <AIProvider>

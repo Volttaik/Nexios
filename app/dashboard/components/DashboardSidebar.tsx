@@ -9,87 +9,74 @@ import { useAI, AI_PROVIDERS } from '@/app/context/AIContext';
 
 /* ── Types ───────────────────────────────────────────────────────────────── */
 export interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'ai';
-  timestamp: Date;
-  imageUrls?: string[];
-  model?: string;
-  provider?: string;
+  id: string; text: string; sender: 'user' | 'ai'; timestamp: Date;
+  imageUrls?: string[]; model?: string; provider?: string;
 }
-
 export interface ChatSession {
-  id: string;
-  title: string;
-  messages: Message[];
-  createdAt: Date;
-  updatedAt: Date;
-  lastMessage?: string;
-  sessionKey?: string;
+  id: string; title: string; messages: Message[];
+  createdAt: Date; updatedAt: Date; lastMessage?: string; sessionKey?: string;
 }
-
 export interface Project {
-  id: string;
-  name: string;
-  description: string;
-  language: string;
-  color: string;
-  files: ProjectFile[];
-  createdAt: string;
-  updatedAt: string;
+  id: string; name: string; description: string; language: string;
+  color: string; files: ProjectFile[]; createdAt: string; updatedAt: string;
 }
-
 export interface ProjectFile {
-  id: string;
-  name: string;
-  content: string;
-  language: string;
+  id: string; name: string; content: string; language: string;
 }
 
-/* ── Exported AI_MODELS for backwards compat ──────────────────────────────── */
 export const AI_MODELS = [
   { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', tag: '2.0', color: '#4285F4', description: 'Fastest & latest' },
   { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', tag: '1.5F', color: '#34A853', description: 'Fast & efficient' },
   { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', tag: '1.5P', color: '#9B59B6', description: 'Most capable' },
 ];
 
-export interface AIModel {
-  id: string; name: string; tag: string; color: string; description: string;
-}
+export interface AIModel { id: string; name: string; tag: string; color: string; description: string; }
 
-/* ── SVG Icons ─────────────────────────────────────────────────────────────── */
-const Icons = {
-  Grid: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-[18px] h-[18px]"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>,
+/* ── Icons ─────────────────────────────────────────────────────────────── */
+const I = {
+  Grid: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-[18px] h-[18px]"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>,
   Chat: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-[18px] h-[18px]"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>,
-  Folder: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-[18px] h-[18px]"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>,
-  Chart: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-[18px] h-[18px]"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+  Code: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-[18px] h-[18px]"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
+  Chart: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-[18px] h-[18px]"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
   Doc: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-[18px] h-[18px]"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
   Gear: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-[18px] h-[18px]"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
-  Plus: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
-  ChevronLeft: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4"><polyline points="15 18 9 12 15 6"/></svg>,
-  ChevronRight: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4"><polyline points="9 18 15 12 9 6"/></svg>,
-  ChevronDown: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5"><polyline points="6 9 12 15 18 9"/></svg>,
+  Plus: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-3.5 h-3.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  Left: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4"><polyline points="15 18 9 12 15 6"/></svg>,
+  Right: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4"><polyline points="9 18 15 12 9 6"/></svg>,
+  Down: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5"><polyline points="6 9 12 15 18 9"/></svg>,
   Sun: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
   Moon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>,
   Logout: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
-  Trash: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>,
+  Trash: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>,
   Edit: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
-  Key: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>,
   Dots: () => <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>,
-  Code: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-[18px] h-[18px]"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
   Check: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-3.5 h-3.5"><polyline points="20 6 9 17 4 12"/></svg>,
   User: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
-  Lock: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-3.5 h-3.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>,
+  Close: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  Menu: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
+  Bolt: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-[18px] h-[18px]"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
 };
 
-/* ── Props ─────────────────────────────────────────────────────────────────── */
-interface DashboardSidebarProps {
+/* ── Nav items ──────────────────────────────────────────────────────────── */
+const NAV = [
+  { href: '/dashboard', label: 'Overview', Icon: I.Grid, exact: true, color: '#6366f1' },
+  { href: '/dashboard/chat', label: 'AI Chat', Icon: I.Chat, color: '#3b82f6' },
+  { href: '/dashboard/projects', label: 'Projects', Icon: I.Code, color: '#10b981' },
+  { href: '/dashboard/analytics', label: 'Analytics', Icon: I.Chart, color: '#f59e0b' },
+  { href: '/dashboard/documents', label: 'Documents', Icon: I.Doc, color: '#8b5cf6' },
+  { href: '/dashboard/settings', label: 'Settings', Icon: I.Gear, color: '#64748b' },
+];
+
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+/* ── Props ─────────────────────────────────────────────────────────────── */
+interface Props {
   user: AppUser | null;
   currentChatId?: string;
-  onChatSelect: (chatId: string) => void;
-  onNewChat: (newSession: ChatSession) => void;
-  onDeleteChat?: (chatId: string) => void;
-  onRenameChat?: (chatId: string, newTitle: string) => void;
+  onChatSelect: (id: string) => void;
+  onNewChat: (s: ChatSession) => void;
+  onDeleteChat?: (id: string) => void;
+  onRenameChat?: (id: string, t: string) => void;
   onLogout?: () => void;
   isOpen: boolean;
   onToggle: () => void;
@@ -97,26 +84,14 @@ interface DashboardSidebarProps {
   onMobileClose: () => void;
   onMobileOpen: () => void;
   selectedModel?: string;
-  onModelChange?: (modelId: string) => void;
+  onModelChange?: (id: string) => void;
 }
 
-const NAV = [
-  { href: '/dashboard', label: 'Overview', Icon: Icons.Grid, exact: true },
-  { href: '/dashboard/chat', label: 'AI Chat', Icon: Icons.Chat },
-  { href: '/dashboard/projects', label: 'Projects', Icon: Icons.Code },
-  { href: '/dashboard/analytics', label: 'Analytics', Icon: Icons.Chart },
-  { href: '/dashboard/documents', label: 'Documents', Icon: Icons.Doc },
-  { href: '/dashboard/settings', label: 'Settings', Icon: Icons.Gear },
-];
-
-function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
-
-/* ── Sidebar Component ─────────────────────────────────────────────────────── */
+/* ── Component ──────────────────────────────────────────────────────────── */
 export default function DashboardSidebar({
   user, currentChatId, onChatSelect, onNewChat, onDeleteChat, onRenameChat,
   onLogout, isOpen, onToggle, isMobileOpen, onMobileClose, onMobileOpen,
-  selectedModel: _externalModel, onModelChange: _onModelChange,
-}: DashboardSidebarProps) {
+}: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
@@ -143,41 +118,38 @@ export default function DashboardSidebar({
   const profileInputRef = useRef<HTMLInputElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  /* Load sessions */
+  /* Load data */
   useEffect(() => {
     const saved = localStorage.getItem('chatSessions');
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        setSessions(parsed.map((s: Record<string, unknown>) => ({
+        setSessions(JSON.parse(saved).map((s: Record<string, unknown>) => ({
           ...s,
           createdAt: new Date(s.createdAt as string),
           updatedAt: new Date(s.updatedAt as string),
-          messages: (s.messages as Array<Record<string, unknown>>).map((m) => ({ ...m, timestamp: new Date(m.timestamp as string) })),
+          messages: (s.messages as Array<Record<string, unknown>>).map(m => ({ ...m, timestamp: new Date(m.timestamp as string) })),
         })));
       } catch { /* ignore */ }
     }
   }, [currentChatId]);
 
-  /* Load projects */
   useEffect(() => {
     const saved = localStorage.getItem('nexios-projects');
-    if (saved) {
-      try { setProjects(JSON.parse(saved)); } catch { /* ignore */ }
-    }
+    if (saved) { try { setProjects(JSON.parse(saved)); } catch { /* ignore */ } }
     const savedPic = localStorage.getItem('profilePicture');
     if (savedPic) setProfilePic(savedPic);
   }, []);
 
-  /* Save sessions */
   useEffect(() => {
     if (sessions.length > 0) localStorage.setItem('chatSessions', JSON.stringify(sessions));
   }, [sessions]);
 
-  /* Close user menu on outside click */
+  /* Close menus on outside click */
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setShowUserMenu(false);
+      setChatMenuId(null);
+      setProjectMenuId(null);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -187,11 +159,9 @@ export default function DashboardSidebar({
     if (editingChatId && editInputRef.current) { editInputRef.current.focus(); editInputRef.current.select(); }
   }, [editingChatId]);
 
-  /* ── Handlers ──────────────────────────────────────────────────────────── */
+  /* Handlers */
   const handleNewChat = () => {
-    const session: ChatSession = {
-      id: genId(), title: 'New Chat', messages: [], createdAt: new Date(), updatedAt: new Date(), sessionKey: genId(),
-    };
+    const session: ChatSession = { id: genId(), title: 'New Chat', messages: [], createdAt: new Date(), updatedAt: new Date(), sessionKey: genId() };
     setSessions(prev => [session, ...prev]);
     onNewChat(session);
     onMobileClose();
@@ -209,8 +179,7 @@ export default function DashboardSidebar({
     const updated = [project, ...projects];
     setProjects(updated);
     localStorage.setItem('nexios-projects', JSON.stringify(updated));
-    setNewProjectName('');
-    setShowNewProject(false);
+    setNewProjectName(''); setShowNewProject(false);
     router.push(`/dashboard/sandbox/${project.id}`);
   };
 
@@ -249,11 +218,7 @@ export default function DashboardSidebar({
     e.target.value = '';
   };
 
-  const handleSaveKey = (providerId: string) => {
-    updateProviderConfig(providerId, { apiKey: tempKey });
-    setEditingKeyFor(null);
-    setTempKey('');
-  };
+  const isActive = (href: string, exact = false) => exact ? pathname === href : pathname.startsWith(href);
 
   const formatDate = (d: Date) => {
     const diff = Date.now() - new Date(d).getTime();
@@ -264,372 +229,404 @@ export default function DashboardSidebar({
     return new Date(d).toLocaleDateString();
   };
 
-  const isActive = (href: string, exact = false) => exact ? pathname === href : pathname.startsWith(href);
-
-  /* ── Sidebar inner ─────────────────────────────────────────────────────── */
+  /* ── Sidebar content ──────────────────────────────────────────────────── */
   const sidebarContent = (
-    <aside className={`flex flex-col h-full transition-all duration-300 ${isOpen ? 'w-72' : 'w-[60px]'}`}
-      style={{ background: 'var(--sidebar)', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-
-      {/* ── Header ───────────────────────────────────────────────────────── */}
-      <div className="h-14 flex items-center px-3 gap-2.5 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shrink-0 shadow-lg">
-          <span className="text-white text-[11px] font-bold tracking-tight">NX</span>
+    <aside
+      className={`flex flex-col h-full transition-all duration-300 ${isOpen ? 'w-72' : 'w-16'}`}
+      style={{ background: 'var(--sidebar)', borderRight: '1px solid rgba(255,255,255,0.07)' }}
+    >
+      {/* Header */}
+      <div className="h-14 flex items-center px-3 gap-3 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-lg"
+          style={{ background: 'linear-gradient(135deg, #5b78ff, #8b5cf6)' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5} className="w-4 h-4"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
         </div>
-        {isOpen && <span className="text-sm font-bold text-white/90 flex-1 truncate tracking-tight">Nexios AI</span>}
-        <button
-          onClick={onToggle}
-          className="p-1.5 rounded-lg hover:bg-white/10 transition-colors hidden md:flex items-center justify-center text-white/40 hover:text-white/80"
-          title={isOpen ? 'Collapse' : 'Expand'}
-        >
-          {isOpen ? <Icons.ChevronLeft /> : <Icons.ChevronRight />}
+        {isOpen && (
+          <div className="flex-1 min-w-0">
+            <span className="text-sm font-bold text-white tracking-tight">Nexios AI</span>
+            <div className="w-2 h-2 rounded-full bg-green-400 inline-block ml-2 animate-pulse-soft" title="Online" />
+          </div>
+        )}
+        <button onClick={onToggle}
+          className="p-1.5 rounded-lg transition-all hidden md:flex items-center justify-center"
+          style={{ color: 'rgba(255,255,255,0.3)' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)', e.currentTarget.style.color = 'rgba(255,255,255,0.8)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = 'rgba(255,255,255,0.3)')}
+          title={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
+          {isOpen ? <I.Left /> : <I.Right />}
         </button>
       </div>
 
-      {/* ── Scrollable body ──────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto scrollbar-none py-3 flex flex-col gap-0.5">
+      {/* Scrollable body */}
+      <div className="flex-1 overflow-y-auto scrollbar-none py-2 flex flex-col">
 
-        {/* Navigation */}
-        <div className="px-2 mb-1">
-          {!isOpen ? null : <p className="text-[10px] font-semibold text-white/20 uppercase tracking-widest px-2.5 mb-1.5">Navigation</p>}
-          {NAV.map(({ href, label, Icon, exact }) => {
-            const active = isActive(href, exact);
-            return (
-              <Link key={href} href={href} onClick={onMobileClose}
-                className={`flex items-center gap-3 px-2.5 py-2 rounded-xl transition-all text-sm group relative mb-0.5
-                  ${active ? 'bg-white/[0.12] text-white' : 'text-white/45 hover:bg-white/[0.07] hover:text-white/80'}
-                  ${!isOpen ? 'justify-center' : ''}
-                `}
-                title={!isOpen ? label : undefined}
-              >
-                {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-blue-400 rounded-r-full" />}
-                <span className={`shrink-0 ${active ? 'text-white' : ''}`}><Icon /></span>
-                {isOpen && <span className="font-medium truncate">{label}</span>}
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* ── Projects section ────────────────────────────────────────────── */}
-        {isOpen && (
-          <div className="px-2 mt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <div className="pt-3">
-              <div className="flex items-center justify-between px-2.5 mb-2">
-                <button onClick={() => setShowProjectsExpanded(!showProjectsExpanded)}
-                  className="flex items-center gap-1.5 text-[10px] font-semibold text-white/30 uppercase tracking-widest hover:text-white/60 transition-colors">
-                  <span className={`transition-transform ${showProjectsExpanded ? '' : '-rotate-90'}`}><Icons.ChevronDown /></span>
-                  Projects ({projects.length})
-                </button>
-                <button onClick={() => setShowNewProject(!showNewProject)}
-                  className="p-1 rounded-md hover:bg-white/10 text-white/30 hover:text-white/80 transition-colors" title="New project">
-                  <Icons.Plus />
-                </button>
-              </div>
-
-              {showNewProject && (
-                <div className="mb-2 px-1 animate-slideDown">
-                  <div className="flex gap-1.5">
-                    <input
-                      type="text" value={newProjectName} onChange={e => setNewProjectName(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleNewProject(); if (e.key === 'Escape') { setShowNewProject(false); setNewProjectName(''); } }}
-                      placeholder="Project name..."
-                      className="flex-1 px-2.5 py-1.5 text-xs bg-white/10 border border-white/15 rounded-lg text-white placeholder-white/30 outline-none focus:border-blue-400"
-                      autoFocus
-                    />
-                    <button onClick={handleNewProject} className="px-2 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-white transition-colors">
-                      <Icons.Check />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {showProjectsExpanded && (
-                <div className="space-y-0.5">
-                  {projects.slice(0, 6).map(project => (
-                    <div key={project.id} className="relative group">
-                      <Link href={`/dashboard/sandbox/${project.id}`} onClick={onMobileClose}
-                        className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer transition-colors
-                          ${pathname === `/dashboard/sandbox/${project.id}` ? 'bg-white/[0.12] text-white' : 'text-white/45 hover:bg-white/[0.07] hover:text-white/80'}
-                        `}>
-                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: project.color }} />
-                        <span className="text-xs font-medium truncate flex-1">{project.name}</span>
-                        <button
-                          onClick={e => { e.preventDefault(); e.stopPropagation(); setProjectMenuId(projectMenuId === project.id ? null : project.id); }}
-                          className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-white/10 rounded transition-all"
-                        >
-                          <Icons.Dots />
-                        </button>
-                      </Link>
-                      {projectMenuId === project.id && (
-                        <div className="absolute right-0 mt-1 w-36 rounded-xl glass-dark shadow-2xl z-50 py-1 animate-scaleIn">
-                          <button onClick={() => { handleDeleteProject(project.id); setProjectMenuId(null); }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors text-left">
-                            <Icons.Trash /> Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {projects.length === 0 && (
-                    <p className="text-xs text-white/20 px-2.5 py-2">No projects yet. Create one above.</p>
-                  )}
-                  {projects.length > 6 && (
-                    <Link href="/dashboard/projects" className="block text-xs text-blue-400/70 hover:text-blue-400 px-2.5 py-1.5 transition-colors">
-                      View all {projects.length} projects →
-                    </Link>
-                  )}
-                </div>
-              )}
-            </div>
+        {/* New chat button (on chat page) */}
+        {isChatPage && isOpen && (
+          <div className="px-2.5 mb-2">
+            <button onClick={handleNewChat}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
+              style={{ background: 'linear-gradient(135deg, rgba(91,120,255,0.25), rgba(139,92,246,0.2))', border: '1px solid rgba(91,120,255,0.3)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'linear-gradient(135deg, rgba(91,120,255,0.35), rgba(139,92,246,0.3))')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'linear-gradient(135deg, rgba(91,120,255,0.25), rgba(139,92,246,0.2))')}>
+              <I.Plus /> New Conversation
+            </button>
           </div>
         )}
 
-        {/* ── Chat sessions (only on chat page) ──────────────────────────── */}
-        {isChatPage && isOpen && (
-          <div className="px-2 mt-2 flex-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <div className="pt-3">
-              <div className="flex items-center justify-between px-2.5 mb-2">
-                <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest">Chats ({sessions.length})</p>
-                <button onClick={handleNewChat} className="p-1 rounded-md hover:bg-white/10 text-white/30 hover:text-white/80 transition-colors" title="New chat">
-                  <Icons.Plus />
-                </button>
+        {/* Navigation */}
+        <nav className="px-2 space-y-0.5">
+          {!isOpen ? null : <p className="text-[10px] font-semibold uppercase tracking-widest px-2.5 mb-2 mt-1" style={{ color: 'rgba(255,255,255,0.2)' }}>Menu</p>}
+          {NAV.map(({ href, label, Icon, exact, color }) => {
+            const active = isActive(href, exact);
+            return (
+              <Link key={href} href={href} onClick={onMobileClose}
+                title={!isOpen ? label : undefined}
+                className={`sidebar-item ${active ? 'active' : ''} ${!isOpen ? 'justify-center px-0' : ''}`}>
+                {active && <span className="nav-active-dot" style={{ background: color }} />}
+                <span className={`shrink-0 transition-colors ${active ? '' : ''}`} style={{ color: active ? color : 'rgba(255,255,255,0.4)' }}>
+                  <Icon />
+                </span>
+                {isOpen && <span className={`truncate ${active ? 'text-white' : ''}`}>{label}</span>}
+                {active && isOpen && <span className="ml-auto w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* AI Model Selector (collapsed shows just icon) */}
+        {isOpen && (
+          <div className="px-2.5 mt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+            <button onClick={() => setShowAIPanel(!showAIPanel)}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.09)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}>
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                style={{ background: activeProvider.color }}>
+                {activeProvider.icon}
               </div>
-              <div className="space-y-0.5">
-                {sessions.map(chat => (
-                  <div key={chat.id} className="relative group">
-                    {editingChatId === chat.id ? (
-                      <div className="p-1" onClick={e => e.stopPropagation()}>
-                        <input ref={editInputRef} type="text" value={editingTitle}
-                          onChange={e => setEditingTitle(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') handleRenameSubmit(chat.id); if (e.key === 'Escape') setEditingChatId(null); }}
-                          onBlur={() => handleRenameSubmit(chat.id)}
-                          className="w-full px-2.5 py-1.5 text-xs bg-white/10 border border-white/20 rounded-lg text-white outline-none focus:border-blue-400"
-                        />
-                      </div>
-                    ) : (
-                      <div onClick={() => { onChatSelect(chat.id); onMobileClose(); setChatMenuId(null); }}
-                        className={`flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer transition-colors
-                          ${currentChatId === chat.id ? 'bg-white/[0.12] text-white' : 'text-white/45 hover:bg-white/[0.07] hover:text-white/80'}
-                        `}>
-                        <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 shrink-0 text-white/25">
-                          <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7z" clipRule="evenodd" />
-                        </svg>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium truncate">{chat.title}</p>
-                          <p className="text-[10px] text-white/25">{formatDate(chat.updatedAt)}</p>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-xs font-semibold text-white/80 truncate">{activeModel.name}</p>
+                <p className="text-[10px] text-white/30 truncate">{activeProvider.shortName}</p>
+              </div>
+              <span className={`transition-transform ${showAIPanel ? 'rotate-180' : ''}`} style={{ color: 'rgba(255,255,255,0.3)' }}><I.Down /></span>
+            </button>
+
+            {showAIPanel && (
+              <div className="mt-2 rounded-xl overflow-hidden animate-slideDown" style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)' }}>
+                {AI_PROVIDERS.map(provider => {
+                  const config = settings.providers[provider.id];
+                  const isProviderActive = settings.activeProvider === provider.id;
+                  const hasKey = !!(config?.apiKey?.trim() || getApiKey(provider.id));
+                  return (
+                    <div key={provider.id} className="border-b last:border-b-0" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                      <button onClick={() => { setActiveProvider(provider.id); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 transition-all text-left"
+                        style={{ background: isProviderActive ? provider.color + '20' : 'transparent' }}
+                        onMouseEnter={e => !isProviderActive && (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+                        onMouseLeave={e => !isProviderActive && (e.currentTarget.style.background = 'transparent')}>
+                        <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                          style={{ background: provider.color }}>
+                          {provider.icon}
                         </div>
-                        <button onClick={e => { e.stopPropagation(); setChatMenuId(chatMenuId === chat.id ? null : chat.id); }}
-                          className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-white/10 rounded transition-all">
-                          <Icons.Dots />
-                        </button>
-                      </div>
-                    )}
-                    {chatMenuId === chat.id && (
-                      <div className="absolute right-0 mt-1 w-40 rounded-xl glass-dark shadow-2xl z-50 py-1 animate-scaleIn">
-                        <button onClick={() => { setEditingChatId(chat.id); setEditingTitle(chat.title); setChatMenuId(null); }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-white/70 hover:bg-white/10 transition-colors text-left">
-                          <Icons.Edit /> Rename
-                        </button>
-                        <button onClick={e => { e.stopPropagation(); setSessions(p => p.filter(s => s.id !== chat.id)); if (onDeleteChat) onDeleteChat(chat.id); setChatMenuId(null); }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors text-left">
-                          <Icons.Trash /> Delete
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-xs font-semibold truncate" style={{ color: isProviderActive ? '#fff' : 'rgba(255,255,255,0.6)' }}>{provider.shortName}</p>
+                            {provider.isFree && <span className="text-[9px] px-1 py-0.5 rounded-full font-bold" style={{ background: '#10b98130', color: '#10b981' }}>FREE</span>}
+                            {hasKey && <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />}
+                          </div>
+                          <p className="text-[10px] text-white/30 truncate">{provider.models.length} models</p>
+                        </div>
+                        {isProviderActive && <I.Check />}
+                      </button>
+
+                      {/* Model selector (when provider active) */}
+                      {isProviderActive && (
+                        <div className="px-3 pb-2.5 space-y-1">
+                          {provider.models.map(m => (
+                            <button key={m.id} onClick={() => setActiveModel(m.id)}
+                              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-all"
+                              style={{ background: config?.selectedModel === m.id ? provider.color + '25' : 'rgba(255,255,255,0.04)', border: `1px solid ${config?.selectedModel === m.id ? provider.color + '50' : 'transparent'}` }}>
+                              <div>
+                                <p className="text-[11px] font-medium" style={{ color: config?.selectedModel === m.id ? '#fff' : 'rgba(255,255,255,0.55)' }}>{m.name}</p>
+                                <p className="text-[9px] text-white/25">{m.description}</p>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {m.supportsImages && <span className="text-[8px] px-1 py-0.5 rounded font-medium" style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)' }}>IMG</span>}
+                                {(m as { free?: boolean }).free && <span className="text-[8px] px-1 py-0.5 rounded font-medium" style={{ background: '#10b98115', color: '#10b981' }}>FREE</span>}
+                              </div>
+                            </button>
+                          ))}
+                          {/* API Key entry */}
+                          {!hasKey && (
+                            <div className="mt-1.5">
+                              {editingKeyFor === provider.id ? (
+                                <div className="flex gap-1.5">
+                                  <input type="password" value={tempKey} onChange={e => setTempKey(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') { updateProviderConfig(provider.id, { apiKey: tempKey }); setEditingKeyFor(null); setTempKey(''); } if (e.key === 'Escape') { setEditingKeyFor(null); setTempKey(''); } }}
+                                    placeholder={provider.apiKeyPlaceholder}
+                                    className="flex-1 px-2 py-1.5 text-[11px] bg-white/10 border border-white/15 rounded-lg text-white placeholder-white/25 outline-none focus:border-blue-400/60"
+                                    autoFocus />
+                                  <button onClick={() => { updateProviderConfig(provider.id, { apiKey: tempKey }); setEditingKeyFor(null); setTempKey(''); }}
+                                    className="px-2 py-1 rounded-lg text-[10px] font-semibold text-white" style={{ background: provider.color }}>
+                                    <I.Check />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button onClick={() => { setEditingKeyFor(provider.id); setTempKey(''); }}
+                                  className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] transition-all"
+                                  style={{ background: provider.isFree ? '#10b98115' : 'rgba(255,255,255,0.06)', color: provider.isFree ? '#10b981' : 'rgba(255,255,255,0.4)', border: `1px solid ${provider.isFree ? '#10b98130' : 'transparent'}` }}>
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3 h-3 shrink-0"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+                                  {provider.isFree ? `Add free ${provider.shortName} key` : `Add ${provider.shortName} API key`}
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Collapsed: AI icon */}
+        {!isOpen && (
+          <div className="px-2 mt-3">
+            <button onClick={() => { if (!isOpen) onToggle(); setShowAIPanel(true); }}
+              className="w-full flex items-center justify-center p-2 rounded-xl transition-all"
+              style={{ background: 'rgba(255,255,255,0.05)' }}
+              title={`${activeProvider.shortName} / ${activeModel.name}`}>
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold text-white"
+                style={{ background: activeProvider.color }}>
+                {activeProvider.icon}
+              </div>
+            </button>
+          </div>
+        )}
+
+        {/* Projects section */}
+        {isOpen && (
+          <div className="px-2 mt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+            <div className="flex items-center justify-between px-2.5 mb-1.5">
+              <button onClick={() => setShowProjectsExpanded(!showProjectsExpanded)}
+                className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest transition-colors"
+                style={{ color: 'rgba(255,255,255,0.25)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.6)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.25)')}>
+                <span className={`transition-transform ${showProjectsExpanded ? '' : '-rotate-90'}`}><I.Down /></span>
+                Projects ({projects.length})
+              </button>
+              <button onClick={() => setShowNewProject(!showNewProject)}
+                className="p-1 rounded-md transition-all" title="New project"
+                style={{ color: 'rgba(255,255,255,0.25)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)', e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = 'rgba(255,255,255,0.25)')}>
+                <I.Plus />
+              </button>
+            </div>
+
+            {showNewProject && (
+              <div className="mb-2 animate-slideDown">
+                <div className="flex gap-1.5">
+                  <input type="text" value={newProjectName} onChange={e => setNewProjectName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleNewProject(); if (e.key === 'Escape') { setShowNewProject(false); setNewProjectName(''); } }}
+                    placeholder="Project name…"
+                    className="flex-1 px-2.5 py-2 text-xs bg-white/[0.08] border border-white/[0.12] rounded-xl text-white placeholder-white/25 outline-none"
+                    style={{ fontSize: 12 }}
+                    autoFocus />
+                  <button onClick={handleNewProject}
+                    className="px-2.5 py-1.5 rounded-xl text-white transition-colors"
+                    style={{ background: 'rgba(91,120,255,0.7)' }}>
+                    <I.Check />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {showProjectsExpanded && (
+              <div className="space-y-0.5">
+                {projects.slice(0, 7).map(project => (
+                  <div key={project.id} className="relative group">
+                    <Link href={`/dashboard/sandbox/${project.id}`} onClick={onMobileClose}
+                      className={`sidebar-item ${pathname === `/dashboard/sandbox/${project.id}` ? 'active' : ''}`}>
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: project.color }} />
+                      <span className="text-xs font-medium truncate flex-1">{project.name}</span>
+                      <button onClick={e => { e.preventDefault(); e.stopPropagation(); setProjectMenuId(projectMenuId === project.id ? null : project.id); }}
+                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded transition-all" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                        <I.Dots />
+                      </button>
+                    </Link>
+                    {projectMenuId === project.id && (
+                      <div className="absolute right-2 top-full mt-1 w-36 rounded-xl glass-dark shadow-2xl z-50 py-1 animate-scaleIn">
+                        <button onClick={() => { handleDeleteProject(project.id); setProjectMenuId(null); }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-400 text-left transition-colors"
+                          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                          <I.Trash /> Delete
                         </button>
                       </div>
                     )}
                   </div>
                 ))}
-                {sessions.length === 0 && (
-                  <div className="text-center py-6">
-                    <p className="text-xs text-white/20">No chats yet</p>
-                    <button onClick={handleNewChat} className="mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors">Start chatting</button>
-                  </div>
+                {projects.length === 0 && (
+                  <p className="text-[11px] px-2.5 py-2" style={{ color: 'rgba(255,255,255,0.2)' }}>No projects yet.</p>
+                )}
+                {projects.length > 7 && (
+                  <Link href="/dashboard/projects" onClick={onMobileClose}
+                    className="block text-[11px] px-2.5 py-1.5 transition-colors"
+                    style={{ color: 'rgba(91,120,255,0.7)' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = 'rgba(91,120,255,1)')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'rgba(91,120,255,0.7)')}>
+                    View all {projects.length} projects →
+                  </Link>
                 )}
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Chat sessions */}
+        {isChatPage && isOpen && (
+          <div className="px-2 mt-3 flex-1 min-h-0" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+            <div className="flex items-center justify-between px-2.5 mb-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                Recent Chats ({sessions.length})
+              </p>
+            </div>
+            <div className="space-y-0.5 overflow-y-auto scrollbar-none" style={{ maxHeight: 220 }}>
+              {sessions.map(chat => (
+                <div key={chat.id} className="relative group">
+                  {editingChatId === chat.id ? (
+                    <div className="p-1">
+                      <input ref={editInputRef} type="text" value={editingTitle}
+                        onChange={e => setEditingTitle(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleRenameSubmit(chat.id); if (e.key === 'Escape') setEditingChatId(null); }}
+                        onBlur={() => handleRenameSubmit(chat.id)}
+                        className="w-full px-2.5 py-1.5 text-xs bg-white/10 border border-white/20 rounded-lg text-white outline-none"
+                        style={{ fontSize: 12 }}
+                      />
+                    </div>
+                  ) : (
+                    <div onClick={() => { onChatSelect(chat.id); onMobileClose(); setChatMenuId(null); }}
+                      className={`sidebar-item cursor-pointer ${currentChatId === chat.id ? 'active' : ''}`}>
+                      {currentChatId === chat.id && <span className="nav-active-dot" style={{ background: '#5b78ff' }} />}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate" style={{ color: currentChatId === chat.id ? '#fff' : 'rgba(255,255,255,0.55)' }}>{chat.title}</p>
+                        <p className="text-[10px] truncate" style={{ color: 'rgba(255,255,255,0.2)' }}>{formatDate(chat.updatedAt)}</p>
+                      </div>
+                      <button onClick={e => { e.stopPropagation(); setChatMenuId(chatMenuId === chat.id ? null : chat.id); }}
+                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded shrink-0" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                        <I.Dots />
+                      </button>
+                    </div>
+                  )}
+                  {chatMenuId === chat.id && (
+                    <div className="absolute right-2 top-full mt-1 w-36 rounded-xl glass-dark shadow-2xl z-50 py-1 animate-scaleIn">
+                      <button onClick={() => { setEditingChatId(chat.id); setEditingTitle(chat.title); setChatMenuId(null); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-white/60 text-left transition-colors"
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <I.Edit /> Rename
+                      </button>
+                      <button onClick={() => {
+                        if (onDeleteChat) onDeleteChat(chat.id);
+                        setSessions(prev => prev.filter(s => s.id !== chat.id));
+                        setChatMenuId(null);
+                      }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-400 text-left transition-colors"
+                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                        <I.Trash /> Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {sessions.length === 0 && (
+                <p className="text-[11px] px-2.5 py-2" style={{ color: 'rgba(255,255,255,0.2)' }}>No chats yet. Start a conversation!</p>
+              )}
             </div>
           </div>
         )}
 
         <div className="flex-1" />
 
-        {/* ── AI Provider Panel ────────────────────────────────────────────── */}
-        {isOpen && (
-          <div className="px-2" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <div className="pt-3 pb-1">
-              <button onClick={() => setShowAIPanel(!showAIPanel)}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-white/[0.07] transition-colors">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-                  style={{ background: activeProvider.color }}>
-                  {activeProvider.icon}
-                </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-xs font-semibold text-white/80 truncate">{activeProvider.shortName}</p>
-                  <p className="text-[10px] text-white/30 truncate">{activeModel.name}</p>
-                </div>
-                <span className={`text-white/30 transition-transform ${showAIPanel ? 'rotate-180' : ''}`}><Icons.ChevronDown /></span>
-              </button>
-
-              {showAIPanel && (
-                <div className="mt-2 rounded-xl border border-white/[0.08] overflow-hidden animate-slideDown" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                  {/* Provider selector */}
-                  <div className="p-2 border-b border-white/[0.06]">
-                    <p className="text-[9px] font-semibold text-white/25 uppercase tracking-widest px-1 mb-1.5">Provider</p>
-                    <div className="grid grid-cols-2 gap-1">
-                      {AI_PROVIDERS.map(p => (
-                        <button key={p.id} onClick={() => setActiveProvider(p.id)}
-                          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs transition-all
-                            ${settings.activeProvider === p.id ? 'bg-white/[0.15] text-white' : 'text-white/40 hover:bg-white/[0.07] hover:text-white/70'}
-                          `}>
-                          <div className="w-4 h-4 rounded flex items-center justify-center text-[8px] font-bold text-white shrink-0" style={{ background: p.color }}>
-                            {p.icon}
-                          </div>
-                          <span className="truncate font-medium">{p.shortName}</span>
-                          {settings.activeProvider === p.id && <Icons.Check />}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Model selector */}
-                  <div className="p-2 border-b border-white/[0.06]">
-                    <p className="text-[9px] font-semibold text-white/25 uppercase tracking-widest px-1 mb-1.5">Model</p>
-                    <div className="space-y-0.5">
-                      {activeProvider.models.map(m => (
-                        <button key={m.id} onClick={() => setActiveModel(m.id)}
-                          className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs transition-all
-                            ${activeModel.id === m.id ? 'bg-white/[0.15] text-white' : 'text-white/40 hover:bg-white/[0.07] hover:text-white/70'}
-                          `}>
-                          <span className="font-medium truncate text-left">{m.name}</span>
-                          <div className="flex items-center gap-1 shrink-0 ml-1">
-                            {m.supportsImages && <span className="text-[9px] text-white/30">📷</span>}
-                            {activeModel.id === m.id && <Icons.Check />}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* API Key */}
-                  <div className="p-2">
-                    <p className="text-[9px] font-semibold text-white/25 uppercase tracking-widest px-1 mb-1.5">API Key</p>
-                    {editingKeyFor === settings.activeProvider ? (
-                      <div className="flex gap-1">
-                        <input type="password" value={tempKey} onChange={e => setTempKey(e.target.value)}
-                          placeholder={activeProvider.apiKeyPlaceholder}
-                          onKeyDown={e => { if (e.key === 'Enter') handleSaveKey(settings.activeProvider); if (e.key === 'Escape') setEditingKeyFor(null); }}
-                          className="flex-1 px-2 py-1.5 text-[11px] bg-white/10 border border-white/15 rounded-lg text-white placeholder-white/25 outline-none focus:border-blue-400"
-                          autoFocus
-                        />
-                        <button onClick={() => handleSaveKey(settings.activeProvider)} className="px-2 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-white text-xs transition-colors">
-                          <Icons.Check />
-                        </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => { setEditingKeyFor(settings.activeProvider); setTempKey(settings.providers[settings.activeProvider]?.apiKey || ''); }}
-                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] transition-colors text-left">
-                        <Icons.Key />
-                        <span className="text-[11px] text-white/40 flex-1 truncate font-mono">
-                          {settings.providers[settings.activeProvider]?.apiKey
-                            ? '••••••••' + settings.providers[settings.activeProvider].apiKey.slice(-4)
-                            : getApiKey(settings.activeProvider) ? 'Using default key' : 'Add API key…'
-                          }
-                        </span>
-                        {(settings.providers[settings.activeProvider]?.apiKey || getApiKey(settings.activeProvider)) && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Collapsed model indicator */}
-        {!isOpen && (
-          <div className="px-1.5 py-2 flex justify-center" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <button onClick={onToggle}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-[9px] font-bold text-white shadow-sm"
-              style={{ background: activeProvider.color }} title={`${activeProvider.shortName} - Click to expand`}>
-              {activeProvider.icon}
-            </button>
-          </div>
-        )}
-
-        {/* ── Dark mode + settings ─────────────────────────────────────────── */}
-        <div className="px-2 pb-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <div className={`flex items-center pt-2 gap-1 ${isOpen ? 'justify-between' : 'justify-center flex-col'}`}>
-            <button onClick={toggleTheme}
-              className={`flex items-center gap-2 px-2.5 py-2 rounded-xl hover:bg-white/[0.07] transition-colors text-white/40 hover:text-white/80 ${!isOpen ? 'justify-center' : 'flex-1'}`}
-              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
-              {isDark ? <Icons.Sun /> : <Icons.Moon />}
-              {isOpen && <span className="text-xs font-medium">{isDark ? 'Light mode' : 'Dark mode'}</span>}
-            </button>
-          </div>
+        {/* Theme toggle */}
+        <div className="px-2 pb-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8 }}>
+          <button onClick={toggleTheme}
+            className={`sidebar-item w-full ${!isOpen ? 'justify-center' : ''}`}
+            title={isDark ? 'Switch to Light mode' : 'Switch to Dark mode'}>
+            <span style={{ color: 'rgba(255,255,255,0.4)' }}>{isDark ? <I.Sun /> : <I.Moon />}</span>
+            {isOpen && <span className="text-xs">{isDark ? 'Light Mode' : 'Dark Mode'}</span>}
+          </button>
         </div>
-      </div>
 
-      {/* ── User footer ──────────────────────────────────────────────────── */}
-      <div className="shrink-0 p-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} ref={userMenuRef}>
-        {user ? (
-          <div className="relative">
-            <button onClick={() => setShowUserMenu(!showUserMenu)}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-white/[0.07] transition-colors ${!isOpen ? 'justify-center' : ''}`}>
-              <div className="relative shrink-0">
+        {/* User section */}
+        <div className="px-2 pb-3 relative" ref={userMenuRef}>
+          {user ? (
+            <>
+              <button onClick={() => setShowUserMenu(!showUserMenu)}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl transition-all ${!isOpen ? 'justify-center' : ''}`}
+                style={{ background: showUserMenu ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.09)')}
+                onMouseLeave={e => (e.currentTarget.style.background = showUserMenu ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)')}>
                 {profilePic
-                  ? <img src={profilePic} alt="You" className="w-8 h-8 rounded-full object-cover ring-1 ring-white/20" />
-                  : <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center ring-1 ring-white/20">
-                      <span className="text-white text-xs font-bold">{user.fullName?.[0]?.toUpperCase() || 'U'}</span>
+                  ? <img src={profilePic} alt="Avatar" className="w-8 h-8 rounded-xl object-cover shrink-0" style={{ border: '2px solid rgba(91,120,255,0.5)' }} />
+                  : <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-sm font-bold shrink-0"
+                      style={{ background: 'linear-gradient(135deg, #5b78ff, #8b5cf6)' }}>
+                      {user.fullName?.[0]?.toUpperCase() || 'U'}
                     </div>
                 }
-                <span className="absolute bottom-0 right-0 w-2 h-2 bg-green-400 rounded-full border-2 border-[#0f0f12]" />
-              </div>
-              {isOpen && (
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-xs font-semibold text-white/80 truncate">{user.fullName}</p>
-                  <p className="text-[10px] text-white/30 truncate">{user.email}</p>
+                {isOpen && (
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-xs font-semibold text-white/80 truncate">{user.fullName}</p>
+                    <p className="text-[10px] text-white/30 truncate">@{user.username}</p>
+                  </div>
+                )}
+                {isOpen && <I.Down />}
+              </button>
+              <input ref={profileInputRef} type="file" accept="image/*" className="hidden" onChange={handleProfilePicUpload} />
+
+              {showUserMenu && (
+                <div className="absolute bottom-full left-2 right-2 mb-2 rounded-2xl glass-dark shadow-2xl py-2 z-50 animate-slideDown">
+                  <div className="px-4 py-2.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                    <p className="text-xs font-bold text-white">{user.fullName}</p>
+                    <p className="text-[10px] text-white/40 truncate">{user.email}</p>
+                  </div>
+                  <button onClick={() => { profileInputRef.current?.click(); setShowUserMenu(false); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-white/60 text-left transition-colors"
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <I.User /> Change Photo
+                  </button>
+                  <Link href="/dashboard/settings" onClick={() => setShowUserMenu(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-xs text-white/60 transition-colors"
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <I.Gear /> Settings
+                  </Link>
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }} />
+                  <button onClick={handleLogout}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-red-400 text-left transition-colors"
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <I.Logout /> Sign out
+                  </button>
                 </div>
               )}
-            </button>
-
-            {showUserMenu && (
-              <div className={`absolute ${isOpen ? 'left-0 right-0' : 'left-12 w-52'} bottom-full mb-2 rounded-2xl glass-dark shadow-2xl z-50 py-2 animate-scaleIn`}>
-                <div className="px-3 py-2 border-b border-white/[0.07] mb-1">
-                  <p className="text-xs font-semibold text-white/80">{user.fullName}</p>
-                  <p className="text-[10px] text-white/30">{user.email}</p>
-                </div>
-                {[
-                  { label: 'Profile', href: '/dashboard/profile', Icon: Icons.User },
-                  { label: 'Settings', href: '/dashboard/settings', Icon: Icons.Gear },
-                ].map(item => (
-                  <Link key={item.href} href={item.href}
-                    onClick={() => { setShowUserMenu(false); onMobileClose(); }}
-                    className="flex items-center gap-2.5 px-3 py-2.5 text-xs text-white/60 hover:bg-white/[0.07] hover:text-white transition-colors">
-                    <item.Icon /> {item.label}
-                  </Link>
-                ))}
-                <div className="border-t border-white/[0.07] mt-1 pt-1">
-                  <button onClick={() => { profileInputRef.current?.click(); setShowUserMenu(false); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-white/60 hover:bg-white/[0.07] hover:text-white transition-colors text-left">
-                    <Icons.User /> Change photo
-                  </button>
-                  <button onClick={handleLogout}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors text-left">
-                    <Icons.Logout /> Sign out
-                  </button>
-                </div>
+            </>
+          ) : (
+            <div className={`flex items-center gap-2.5 px-2.5 py-2 ${!isOpen ? 'justify-center' : ''}`}>
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                <I.User />
               </div>
-            )}
-            <input ref={profileInputRef} type="file" accept="image/*" className="hidden" onChange={handleProfilePicUpload} />
-          </div>
-        ) : (
-          <div className={`flex items-center gap-2.5 px-2.5 py-2 ${!isOpen ? 'justify-center' : ''}`}>
-            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-              <Icons.User />
+              {isOpen && <span className="text-xs text-white/25">Not signed in</span>}
             </div>
-            {isOpen && <span className="text-xs text-white/30">Not signed in</span>}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </aside>
   );
@@ -637,18 +634,20 @@ export default function DashboardSidebar({
   return (
     <>
       {/* Mobile overlay */}
-      {isMobileOpen && <div className="fixed inset-0 bg-black/70 z-30 md:hidden backdrop-blur-sm" onClick={onMobileClose} />}
+      {isMobileOpen && (
+        <div className="fixed inset-0 z-30 md:hidden animate-fadeIn"
+          style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+          onClick={onMobileClose} />
+      )}
 
-      {/* Mobile toggle */}
-      <button
-        onClick={onMobileOpen}
-        className="fixed top-3 left-3 z-50 md:hidden w-9 h-9 flex items-center justify-center rounded-xl text-white/80 hover:text-white transition-colors"
-        style={{ background: 'rgba(15,15,18,0.9)', border: '1px solid rgba(255,255,255,0.1)' }}
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
-          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-        </svg>
-      </button>
+      {/* Mobile toggle button — hidden when menu is open */}
+      {!isMobileOpen && (
+        <button onClick={onMobileOpen}
+          className="fixed top-3 left-3 z-50 md:hidden w-9 h-9 flex items-center justify-center rounded-xl"
+          style={{ background: 'rgba(13,13,16,0.95)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)' }}>
+          <I.Menu />
+        </button>
+      )}
 
       {/* Desktop sidebar */}
       <div className="fixed top-0 left-0 h-full z-40 hidden md:block">
@@ -658,6 +657,14 @@ export default function DashboardSidebar({
       {/* Mobile sidebar */}
       <div className={`fixed top-0 left-0 h-full z-40 md:hidden transition-transform duration-300 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
         style={{ width: 288 }}>
+        {/* Mobile close button inside panel */}
+        <div className="absolute top-3 right-3 z-10">
+          <button onClick={onMobileClose}
+            className="w-8 h-8 flex items-center justify-center rounded-xl"
+            style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>
+            <I.Close />
+          </button>
+        </div>
         {sidebarContent}
       </div>
     </>
