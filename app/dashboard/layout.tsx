@@ -15,8 +15,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<AppUser | null>(null);
   const subdomain = useSubdomain();
 
-  // Project workspace gets its own full-screen layout
-  const isWorkspace = pathname?.includes('/projects/') && pathname?.split('/').length > 4;
+  // Project workspace gets its own full-screen layout — match /dashboard/projects/[any-id]
+  const isWorkspace = /\/dashboard\/projects\/[^/]+/.test(pathname || '');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -41,7 +41,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   if (isWorkspace) {
-    return <div style={{ background: 'var(--bg-primary)' }}>{children}</div>;
+    return <div style={{ background: 'var(--bg-primary)', minHeight: '100vh' }}>{children}</div>;
   }
 
   return (
