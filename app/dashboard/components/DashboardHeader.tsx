@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { HiBell, HiOutlineMenuAlt2, HiSearch } from 'react-icons/hi';
-import { BsRobot } from 'react-icons/bs';
 import UserDropdown from './UserDropdown';
 import type { AppUser } from '@/app/types/user';
 
