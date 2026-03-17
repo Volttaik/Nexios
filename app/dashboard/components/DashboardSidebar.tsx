@@ -6,12 +6,39 @@ import { BsRobot, BsGrid, BsChatDots, BsBarChart, BsGear } from 'react-icons/bs'
 import { HiFolder } from 'react-icons/hi';
 import type { AppUser } from '@/app/types/user';
 
+export interface ChatMessage {
+  id?: string;
+  sender: 'user' | 'ai';
+  text: string;
+  timestamp?: Date;
+  imageUrls?: string[];
+  provider?: string;
+  model?: string;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: Date;
+  updatedAt: Date;
+  sessionKey: string;
+}
+
 interface DashboardSidebarProps {
   isOpen: boolean;
   user: AppUser | null;
   onClose?: () => void;
   isMobileOpen: boolean;
   onMobileClose: () => void;
+  onMobileOpen?: () => void;
+  onToggle?: () => void;
+  onLogout?: () => void;
+  currentChatId?: string;
+  onChatSelect?: (id: string) => void;
+  onNewChat?: (session: ChatSession) => void;
+  onDeleteChat?: (id: string) => void;
+  onRenameChat?: (id: string, title: string) => void;
 }
 
 const NAV = [
