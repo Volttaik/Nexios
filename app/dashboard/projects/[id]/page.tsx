@@ -12,10 +12,9 @@ import {
 } from 'react-icons/bs';
 import {
   HiArrowLeft,
-  HiFolder, HiMenu, HiOutlineFolder, HiCode, HiPaperAirplane, HiX
+  HiFolder, HiMenu, HiOutlineFolder, HiPaperAirplane, HiX, HiGlobeAlt
 } from 'react-icons/hi';
 import { SiFigma } from 'react-icons/si';
-import Link from 'next/link';
 import { useAI } from '@/app/context/AIContext';
 import { callAI } from '@/app/lib/ai';
 
@@ -323,10 +322,15 @@ export default function ProjectWorkspace() {
 
   const [termLines, setTermLines] = useState<TerminalLine[]>([
     { type: 'output', text: '── Nexios Workspace Terminal ──────────────────' },
-    { type: 'success', text: '✓ Environment ready at /workspace' },
+    { type: 'success', text: '✓ Sandbox ready — npm, node, python3 available' },
+    { type: 'output', text: '  Type "help" for commands or "git clone <url>"' },
     { type: 'output', text: '' },
   ]);
   const [termInput, setTermInput] = useState('');
+  const [termLoading, setTermLoading] = useState(false);
+  const [cloneImportUrl, setCloneImportUrl] = useState('');
+  const [showCloneInput, setShowCloneInput] = useState(false);
+  const [cloneImporting, setCloneImporting] = useState(false);
   const termEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -500,6 +504,61 @@ export default function ProjectWorkspace() {
     e.target.value = '';
   };
 
+  // ── Detect project type ──
+  const detectProjectType = (fileList: FileNode[]): 'html' | 'nodejs' | 'python' | 'unknown' => {
+    const allNodes = getAllFileNodes(fileList);
+    const paths = allNodes.map(n => n.path.toLowerCase());
+    const hasPkg = paths.some(p => p === 'package.json' || p.endsWith('/package.json'));
+    const hasPy = paths.some(p => p.endsWith('.py'));
+    const hasReqs = paths.some(p => p === 'requirements.txt' || p.endsWith('/requirements.txt'));
+    const hasHtml = paths.some(p => p.endsWith('.html') || p.endsWith('.htm'));
+    if (hasPkg) return 'nodejs';
+    if (hasPy || hasReqs) return 'python';
+    if (hasHtml) return 'html';
+    return 'unknown';
+  };
+
+  // ── GitHub clone helper (used by both terminal and import button) ──
+  const cloneRepoIntoWorkspace = async (repoUrl: string, existingFiles: FileNode[]) => {
+    const match = repoUrl.match(/github\.com\/([^/]+)\/([^/\s.]+)/);
+    if (!match) throw new Error('Only GitHub URLs are supported (https://github.com/owner/repo)');
+    const [, owner, repo] = match;
+    setTermLines(p => [...p, { type: 'output', text: `Cloning into '${repo}'…` }]);
+    setTermLines(p => [...p, { type: 'output', text: 'remote: Enumerating objects…' }]);
+    const treeResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`);
+    if (!treeResp.ok) {
+      const errData = await treeResp.json().catch(() => ({}));
+      throw new Error(errData.message || 'repository not found or is private');
+    }
+    const treeData = await treeResp.json();
+    const fileItems = (treeData.tree as { type: string; path: string; size?: number }[]).filter(item => item.type === 'blob' && (item.size || 0) < 500000);
+    setTermLines(p => [...p, { type: 'output', text: `remote: Total ${fileItems.length} files, fetching…` }]);
+    let fetched = 0;
+    let newFiles = [...existingFiles];
+    const BATCH = 6;
+    for (let i = 0; i < fileItems.length; i += BATCH) {
+      const batch = fileItems.slice(i, i + BATCH);
+      await Promise.all(batch.map(async (item) => {
+        try {
+          const contentResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${item.path}`);
+          if (!contentResp.ok) return;
+          const contentData = await contentResp.json();
+          if (contentData.content) {
+            const decoded = atob(contentData.content.replace(/\n/g, ''));
+            newFiles = addFileByPath(newFiles, item.path, decoded);
+            fetched++;
+          }
+        } catch { /* skip binary/large files */ }
+      }));
+      setTermLines(p => [...p, { type: 'output', text: `  ${Math.min(i + BATCH, fileItems.length)}/${fileItems.length} files…` }]);
+    }
+    setFiles(newFiles);
+    const paths = getAllFilePaths(newFiles);
+    if (paths.length) setSelectedPath(paths[0]);
+    setTermLines(p => [...p, { type: 'success', text: `✓ Cloned ${repo}: ${fetched} files imported` }]);
+    return { repo, fetched, newFiles };
+  };
+
   // ── Copy file path ──
   const copyPath = () => {
     if (selectedPath) {
@@ -509,71 +568,201 @@ export default function ProjectWorkspace() {
     }
   };
 
-  // ── Run file / project ──
-  const runFile = () => {
-    const ext = selectedPath.split('.').pop()?.toLowerCase();
-    if (ext === 'html') {
-      const node = findNodeByPath(files, selectedPath);
-      if (!node?.content) return;
-      // Find linked CSS and JS files and inline them
+  // ── Run file (language-aware) ──
+  const runFile = async () => {
+    const ext = selectedPath.split('.').pop()?.toLowerCase() || '';
+    const node = findNodeByPath(files, selectedPath);
+    if (!node?.content) return;
+
+    if (ext === 'html' || ext === 'htm') {
       let html = node.content;
       const allNodes = getAllFileNodes(files);
-      // Inline CSS
       allNodes.filter(f => f.path.endsWith('.css')).forEach(css => {
         html = html.replace(/<link[^>]*href=["']([^"']*\.css)["'][^>]*>/gi, (match, href) => {
-          if (css.path.endsWith(href) || href === css.path) {
-            return `<style>${css.content}</style>`;
-          }
+          if (css.path.endsWith(href) || href === css.path) return `<style>${css.content}</style>`;
           return match;
         });
       });
-      // Inline JS
       allNodes.filter(f => f.path.endsWith('.js')).forEach(js => {
         html = html.replace(/<script[^>]*src=["']([^"']*)["'][^>]*><\/script>/gi, (match, src) => {
-          if (js.path.endsWith(src) || src === js.path) {
-            return `<script>${js.content}</script>`;
-          }
+          if (js.path.endsWith(src) || src === js.path) return `<script>${js.content}</script>`;
           return match;
         });
       });
       setRunOutput({ html, title: selectedPath });
-    } else {
-      // For non-HTML files, show a simple output window
-      const node = findNodeByPath(files, selectedPath);
-      const ext2 = selectedPath.split('.').pop()?.toLowerCase();
-      const simulated = `<html><head><title>Run: ${selectedPath}</title><style>body{background:#0d1117;color:#c9d1d9;font-family:monospace;padding:24px;margin:0;}pre{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;overflow-x:auto;font-size:13px;line-height:1.6;}h2{color:#58a6ff;font-size:14px;margin:0 0 12px;}span.comment{color:#8b949e;}span.ok{color:#3fb950;}span.warn{color:#d29922;}</style></head><body>
-        <h2>▶ ${selectedPath}</h2>
-        <pre>${ext2 === 'py' ? `<span class="comment"># Python runtime not available in browser</span>\n<span class="comment"># Your code:</span>\n\n${node?.content?.replace(/</g, '&lt;').replace(/>/g, '&gt;') || ''}\n\n<span class="warn">→ To run Python, copy this code to your local terminal.</span>` : ext2 === 'js' || ext2 === 'ts' ? `<span class="comment">// Nexios Sandbox Output</span>\n<span class="ok">✓ File loaded: ${selectedPath}</span>\n<span class="comment">→ Executing in sandbox...</span>\n\n${ext2 === 'ts' ? '<span class="warn">TypeScript files require compilation first. Ask AI to help run this.</span>' : `<script-output>${node?.content?.slice(0, 200).replace(/</g, '&lt;') || ''}...</script-output>`}` : `<span class="ok">✓ File: ${selectedPath}</span>\n${node?.content?.replace(/</g, '&lt;').replace(/>/g, '&gt;') || ''}`}</pre>
-      </body></html>`;
-      setRunOutput({ html: simulated, title: `Run: ${selectedPath}` });
-    }
-  };
-
-  const runProject = () => {
-    const allNodes = getAllFileNodes(files);
-    const htmlFiles = allNodes.filter(f => f.path.endsWith('.html') || f.path.endsWith('.htm'));
-    const indexFile = htmlFiles.find(f => f.path.includes('index')) || htmlFiles[0];
-
-    if (!indexFile) {
-      // Build a file listing page
-      const listing = `<html><head><title>${project?.name} — Nexios</title><style>body{background:#0d1117;color:#c9d1d9;font-family:system-ui;padding:24px;}.file{padding:8px 12px;border-radius:6px;border:1px solid #30363d;margin:4px 0;cursor:pointer;background:#161b22;font-family:monospace;font-size:13px;}.file:hover{border-color:#58a6ff;color:#58a6ff;}h2{color:#fff;font-size:16px;}p{color:#8b949e;font-size:13px;}</style></head>
-      <body><h2>📁 ${project?.name}</h2><p>${allNodes.length} files — no index.html found. Create one to preview your project.</p>
-      ${allNodes.map(f => `<div class="file">${f.path}</div>`).join('')}</body></html>`;
-      setRunOutput({ html: listing, title: project?.name || 'Project' });
       return;
     }
 
-    // Bundle HTML with inline CSS and JS
-    let html = indexFile.content;
-    allNodes.filter(f => f.path.endsWith('.css')).forEach(css => {
-      const fileName = css.path.split('/').pop();
-      html = html.replace(new RegExp(`<link[^>]*href=["'][./]*${fileName}["'][^>]*>`, 'gi'), `<style>${css.content}</style>`);
+    if (ext === 'py') {
+      setPanelTab('terminal');
+      setTermLoading(true);
+      setTermLines(p => [...p, { type: 'output', text: `▶ python3 ${selectedPath}` }]);
+      try {
+        const resp = await fetch('/api/terminal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: `python3 ${selectedPath}`, files: getAllFileNodes(files), projectId: id }),
+        });
+        const data = await resp.json();
+        data.output.split('\n').forEach((line: string) => setTermLines(p => [...p, { type: data.error ? 'error' : 'output', text: line }]));
+        if (!data.error) setTermLines(p => [...p, { type: 'success', text: '✓ Finished' }]);
+      } catch { setTermLines(p => [...p, { type: 'error', text: 'Sandbox unreachable — try again' }]); }
+      setTermLoading(false);
+      return;
+    }
+
+    if (ext === 'js' || ext === 'mjs') {
+      setPanelTab('terminal');
+      setTermLoading(true);
+      setTermLines(p => [...p, { type: 'output', text: `▶ node ${selectedPath}` }]);
+      try {
+        const resp = await fetch('/api/terminal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: `node ${selectedPath}`, files: getAllFileNodes(files), projectId: id }),
+        });
+        const data = await resp.json();
+        data.output.split('\n').forEach((line: string) => setTermLines(p => [...p, { type: data.error ? 'error' : 'output', text: line }]));
+        if (!data.error) setTermLines(p => [...p, { type: 'success', text: '✓ Finished' }]);
+      } catch { setTermLines(p => [...p, { type: 'error', text: 'Sandbox unreachable — try again' }]); }
+      setTermLoading(false);
+      return;
+    }
+
+    if (ext === 'ts' || ext === 'tsx') {
+      setPanelTab('terminal');
+      setTermLines(p => [...p,
+        { type: 'output', text: `▶ Detected TypeScript: ${selectedPath}` },
+        { type: 'output', text: '  Running with tsx (TypeScript executor)…' },
+      ]);
+      setTermLoading(true);
+      try {
+        const resp = await fetch('/api/terminal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: `npx tsx ${selectedPath}`, files: getAllFileNodes(files), projectId: id }),
+        });
+        const data = await resp.json();
+        data.output.split('\n').forEach((line: string) => setTermLines(p => [...p, { type: data.error ? 'error' : 'output', text: line }]));
+        if (!data.error) setTermLines(p => [...p, { type: 'success', text: '✓ Finished' }]);
+      } catch { setTermLines(p => [...p, { type: 'error', text: 'Sandbox unreachable — try again' }]); }
+      setTermLoading(false);
+      return;
+    }
+
+    setRunOutput({
+      html: `<html><head><style>body{background:#0d1117;color:#c9d1d9;font-family:monospace;padding:24px;}</style></head><body><pre>${node.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre></body></html>`,
+      title: selectedPath,
     });
-    allNodes.filter(f => f.path.endsWith('.js') && !f.path.endsWith('.min.js')).forEach(js => {
-      const fileName = js.path.split('/').pop();
-      html = html.replace(new RegExp(`<script[^>]*src=["'][./]*${fileName}["'][^>]*></script>`, 'gi'), `<script>${js.content}</script>`);
-    });
-    setRunOutput({ html, title: project?.name || 'Project' });
+  };
+
+  // ── Run project (language-aware) ──
+  const runProject = async () => {
+    const allNodes = getAllFileNodes(files);
+    const type = detectProjectType(files);
+
+    if (type === 'html') {
+      const htmlFiles = allNodes.filter(f => f.path.endsWith('.html') || f.path.endsWith('.htm'));
+      const indexFile = htmlFiles.find(f => f.path.includes('index')) || htmlFiles[0];
+      if (!indexFile) {
+        const listing = `<html><head><title>${project?.name}</title><style>body{background:#0d1117;color:#c9d1d9;font-family:system-ui;padding:24px;}.file{padding:8px 12px;border-radius:6px;border:1px solid #30363d;margin:4px 0;background:#161b22;font-family:monospace;font-size:13px;}h2{color:#fff;font-size:16px;}p{color:#8b949e;font-size:13px;}</style></head><body><h2>📁 ${project?.name}</h2><p>${allNodes.length} files — no index.html found.</p>${allNodes.map(f=>`<div class="file">${f.path}</div>`).join('')}</body></html>`;
+        setRunOutput({ html: listing, title: project?.name || 'Project' });
+        return;
+      }
+      let html = indexFile.content;
+      allNodes.filter(f => f.path.endsWith('.css')).forEach(css => {
+        const fn = css.path.split('/').pop();
+        html = html.replace(new RegExp(`<link[^>]*href=["'][./]*${fn}["'][^>]*>`, 'gi'), `<style>${css.content}</style>`);
+      });
+      allNodes.filter(f => f.path.endsWith('.js') && !f.path.endsWith('.min.js')).forEach(js => {
+        const fn = js.path.split('/').pop();
+        html = html.replace(new RegExp(`<script[^>]*src=["'][./]*${fn}["'][^>]*></script>`, 'gi'), `<script>${js.content}</script>`);
+      });
+      setRunOutput({ html, title: project?.name || 'Project' });
+      return;
+    }
+
+    if (type === 'nodejs') {
+      setPanelTab('terminal');
+      const pkgNode = allNodes.find(n => n.path === 'package.json' || n.path.endsWith('/package.json'));
+      let runCmd = 'node index.js';
+      if (pkgNode?.content) {
+        try {
+          const pkg = JSON.parse(pkgNode.content);
+          if (pkg.scripts?.dev) runCmd = 'npm run dev';
+          else if (pkg.scripts?.start) runCmd = 'npm start';
+          else if (pkg.main) runCmd = `node ${pkg.main}`;
+        } catch { /* ignore */ }
+      }
+      setTermLines(p => [...p,
+        { type: 'output', text: '▶ Node.js project detected' },
+        { type: 'output', text: '  Step 1/2 — Installing dependencies…' },
+      ]);
+      setTermLoading(true);
+      try {
+        const installResp = await fetch('/api/terminal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: 'npm install', files: allNodes, projectId: id }),
+        });
+        const installData = await installResp.json();
+        installData.output.split('\n').filter(Boolean).slice(0, 20).forEach((line: string) => setTermLines(p => [...p, { type: 'output', text: `  ${line}` }]));
+        setTermLines(p => [...p, { type: 'success', text: '✓ npm install complete' }]);
+
+        setTermLines(p => [...p, { type: 'output', text: `  Step 2/2 — Starting: ${runCmd}…` }]);
+        const runResp = await fetch('/api/terminal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: runCmd, files: allNodes, projectId: id }),
+        });
+        const runData = await runResp.json();
+        runData.output.split('\n').filter(Boolean).forEach((line: string) => setTermLines(p => [...p, { type: 'output', text: `  ${line}` }]));
+        setTermLines(p => [...p, { type: 'success', text: `✓ Project running (${runCmd})` }]);
+      } catch { setTermLines(p => [...p, { type: 'error', text: 'Sandbox unreachable — try running commands manually' }]); }
+      setTermLoading(false);
+      return;
+    }
+
+    if (type === 'python') {
+      setPanelTab('terminal');
+      const entryPoints = ['main.py', 'app.py', 'run.py', 'server.py', 'index.py'];
+      const entryNode = allNodes.find(n => entryPoints.includes(n.path.split('/').pop() || ''));
+      const entryFile = entryNode?.path || allNodes.find(n => n.path.endsWith('.py'))?.path || 'main.py';
+      setTermLines(p => [...p,
+        { type: 'output', text: '▶ Python project detected' },
+      ]);
+      setTermLoading(true);
+      const reqNode = allNodes.find(n => n.path === 'requirements.txt' || n.path.endsWith('/requirements.txt'));
+      if (reqNode) {
+        setTermLines(p => [...p, { type: 'output', text: '  Installing requirements.txt…' }]);
+        try {
+          const pipResp = await fetch('/api/terminal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: 'pip3 install -r requirements.txt', files: allNodes, projectId: id }),
+          });
+          const pipData = await pipResp.json();
+          pipData.output.split('\n').filter(Boolean).slice(0, 10).forEach((line: string) => setTermLines(p => [...p, { type: 'output', text: `  ${line}` }]));
+          setTermLines(p => [...p, { type: 'success', text: '✓ pip install complete' }]);
+        } catch { /* ignore */ }
+      }
+      setTermLines(p => [...p, { type: 'output', text: `  Running: python3 ${entryFile}…` }]);
+      try {
+        const runResp = await fetch('/api/terminal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: `python3 ${entryFile}`, files: allNodes, projectId: id }),
+        });
+        const runData = await runResp.json();
+        runData.output.split('\n').filter(Boolean).forEach((line: string) => setTermLines(p => [...p, { type: runData.error ? 'error' : 'output', text: line }]));
+        if (!runData.error) setTermLines(p => [...p, { type: 'success', text: '✓ Finished' }]);
+      } catch { setTermLines(p => [...p, { type: 'error', text: 'Sandbox unreachable' }]); }
+      setTermLoading(false);
+      return;
+    }
+
+    const listing = `<html><head><title>${project?.name}</title><style>body{background:#0d1117;color:#c9d1d9;font-family:system-ui;padding:24px;}.file{padding:8px 12px;border-radius:6px;border:1px solid #30363d;margin:4px 0;background:#161b22;font-family:monospace;font-size:13px;}h2{color:#fff;font-size:16px;}p{color:#8b949e;font-size:13px;}</style></head><body><h2>📁 ${project?.name}</h2><p>${allNodes.length} files</p>${allNodes.map(f=>`<div class="file">${f.path}</div>`).join('')}</body></html>`;
+    setRunOutput({ html: listing, title: project?.name || 'Project' });
   };
 
   // ── ZIP Export ──
@@ -596,13 +785,38 @@ export default function ProjectWorkspace() {
 
   // ── Terminal ──
   const runTerminalCommand = async () => {
-    if (!termInput.trim()) return;
+    if (!termInput.trim() || termLoading) return;
     const cmd = termInput.trim();
     setTermLines(p => [...p, { type: 'input', text: `$ ${cmd}` }]);
     setTermInput('');
     const parts = cmd.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
     const command = parts[0];
-    const args = parts.slice(1).map(a => a.replace(/^['"]|['"]$/g, ''));
+    const args = parts.slice(1).map((a: string) => a.replace(/^['"]|['"]$/g, ''));
+
+    // ── Real shell commands — route to sandbox API ──
+    const REAL_PREFIXES = ['npm', 'npx', 'node', 'python3', 'python', 'pip3', 'pip', 'yarn', 'pnpm', 'deno', 'bun'];
+    if (REAL_PREFIXES.includes(command)) {
+      setTermLoading(true);
+      setTermLines(p => [...p, { type: 'output', text: `⚡ Sandbox executing: ${cmd}` }]);
+      try {
+        const allFileNodes = getAllFileNodes(files);
+        const resp = await fetch('/api/terminal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: cmd, files: allFileNodes, projectId: id }),
+        });
+        const data = await resp.json();
+        const lines = (data.output || '').split('\n');
+        lines.forEach((line: string) => {
+          if (line !== undefined) setTermLines(p => [...p, { type: data.error ? 'error' : 'output', text: line }]);
+        });
+        if (!data.error) setTermLines(p => [...p, { type: 'success', text: '✓ Done' }]);
+      } catch {
+        setTermLines(p => [...p, { type: 'error', text: 'Sandbox unreachable — check your connection' }]);
+      }
+      setTermLoading(false);
+      return;
+    }
 
     if (command === 'ls') {
       const paths = getAllFilePaths(files);
@@ -626,59 +840,46 @@ export default function ProjectWorkspace() {
       setTermLines([]);
     } else if (command === 'run') {
       runProject();
-      setTermLines(p => [...p, { type: 'success', text: 'Opening project preview...' }]);
+      setTermLines(p => [...p, { type: 'success', text: 'Starting project…' }]);
     } else if (command === 'help') {
-      ['ls              list files', 'cat <file>      show file contents', 'touch <file>    create file',
-        'rm <file>       delete file', 'pwd             print working directory', 'echo <text>     print text',
-        'run             run project preview', 'git clone <url> import GitHub repository', 'clear           clear terminal'
+      [
+        'Built-in commands:',
+        '  ls                   list workspace files',
+        '  cat <file>           show file contents',
+        '  touch <file>         create empty file',
+        '  rm <file>            delete file',
+        '  pwd                  print directory',
+        '  echo <text>          print text',
+        '  run                  run project (auto-detects language)',
+        '  git clone <url>      import GitHub repository',
+        '  clear                clear terminal',
+        '',
+        'Real sandbox commands (run on Linux):',
+        '  npm install          install Node.js dependencies',
+        '  npm run dev          start dev server',
+        '  npm run build        build project',
+        '  node <file>          run JavaScript file',
+        '  python3 <file>       run Python script',
+        '  pip3 install <pkg>   install Python package',
+        '  npx <tool>           run any npm package',
       ].forEach(line => setTermLines(p => [...p, { type: 'output', text: line }]));
     } else if (command === 'git' && args[0] === 'clone' && args[1]) {
-      const repoUrl = args[1];
-      const match = repoUrl.match(/github\.com\/([^/]+)\/([^/\s.]+)/);
-      if (!match) {
-        setTermLines(p => [...p, { type: 'error', text: 'git clone: only GitHub URLs are supported (https://github.com/owner/repo)' }]);
-        return;
-      }
-      const [, owner, repo] = match;
-      setTermLines(p => [...p, { type: 'output', text: `Cloning into '${repo}'…` }]);
-      setTermLines(p => [...p, { type: 'output', text: 'remote: Enumerating objects…' }]);
       try {
-        const treeResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`);
-        if (!treeResp.ok) {
-          const errData = await treeResp.json().catch(() => ({}));
-          setTermLines(p => [...p, { type: 'error', text: `fatal: ${errData.message || 'repository not found or is private'}` }]);
-          return;
-        }
-        const treeData = await treeResp.json();
-        const fileItems = (treeData.tree as any[]).filter(item => item.type === 'blob' && item.size < 500000);
-        setTermLines(p => [...p, { type: 'output', text: `remote: Total ${fileItems.length} files, fetching…` }]);
-
-        let fetched = 0;
-        let newFiles = [...files];
-        const BATCH = 6;
-        for (let i = 0; i < fileItems.length; i += BATCH) {
-          const batch = fileItems.slice(i, i + BATCH);
-          await Promise.all(batch.map(async (item: any) => {
-            try {
-              const contentResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${item.path}`);
-              if (!contentResp.ok) return;
-              const contentData = await contentResp.json();
-              if (contentData.content) {
-                const decoded = atob(contentData.content.replace(/\n/g, ''));
-                newFiles = addFileByPath(newFiles, item.path, decoded);
-                fetched++;
-              }
-            } catch { /* skip binary/large files */ }
-          }));
-          setTermLines(p => [...p, { type: 'output', text: `  ${Math.min(i + BATCH, fileItems.length)}/${fileItems.length} files fetched…` }]);
-        }
-        setFiles(newFiles);
-        const paths = getAllFilePaths(newFiles);
-        if (paths.length) setSelectedPath(paths[0]);
-        setTermLines(p => [...p, { type: 'success', text: `✓ Cloned ${repo}: ${fetched} files imported into workspace` }]);
+        await cloneRepoIntoWorkspace(args[1], files);
       } catch (err) {
         setTermLines(p => [...p, { type: 'error', text: `fatal: ${err instanceof Error ? err.message : 'network error'}` }]);
       }
+    } else if (command === 'git') {
+      setTermLines(p => [...p, { type: 'output', text: 'git: supported commands: clone <url>' }]);
+    } else if (command === 'which') {
+      const tools: Record<string, string> = { node: '/usr/bin/node', npm: '/usr/bin/npm', python3: '/usr/bin/python3', python: '/usr/bin/python3', pip3: '/usr/bin/pip3' };
+      setTermLines(p => [...p, { type: 'output', text: tools[args[0]] || `${args[0]}: not found` }]);
+    } else if (command === 'uname') {
+      setTermLines(p => [...p, { type: 'output', text: 'Linux nexios-sandbox 6.1.0 #1 SMP x86_64 GNU/Linux' }]);
+    } else if (command === 'whoami') {
+      setTermLines(p => [...p, { type: 'output', text: 'nexios' }]);
+    } else if (command === 'date') {
+      setTermLines(p => [...p, { type: 'output', text: new Date().toString() }]);
     } else {
       setTermLines(p => [...p, { type: 'error', text: `${command}: command not found — type 'help' for available commands` }]);
     }
@@ -921,7 +1122,50 @@ You MUST use <nexios_ops> to create or edit files. Never paste code in chat — 
                       className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] text-white/60 hover:text-white hover:bg-white/5 transition-colors border border-white/10">
                       <BsFolderPlus size={10} /> Import entire folder
                     </button>
-                    <button onClick={() => setCreatingIn(null)} className="w-full text-[9px] text-white/30 hover:text-white/60 py-1">Cancel</button>
+                    <button onClick={() => { setShowCloneInput(v => !v); setCloneImportUrl(''); }}
+                      className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] text-indigo-300 hover:text-indigo-200 hover:bg-indigo-500/10 transition-colors border border-indigo-500/30">
+                      <HiGlobeAlt size={10} /> Clone from GitHub
+                    </button>
+                    {showCloneInput && (
+                      <div className="space-y-1 pt-0.5">
+                        <input
+                          value={cloneImportUrl}
+                          onChange={e => setCloneImportUrl(e.target.value)}
+                          placeholder="https://github.com/owner/repo"
+                          className="w-full px-2 py-1 text-[10px] bg-black/40 border border-white/20 rounded outline-none focus:border-indigo-400 text-white placeholder-white/30"
+                          onKeyDown={async e => {
+                            if (e.key === 'Enter' && cloneImportUrl.trim()) {
+                              setCloneImporting(true);
+                              setPanelTab('terminal');
+                              setCreatingIn(null);
+                              setShowCloneInput(false);
+                              try { await cloneRepoIntoWorkspace(cloneImportUrl.trim(), files); }
+                              catch (err) { setTermLines(p => [...p, { type: 'error', text: `fatal: ${err instanceof Error ? err.message : 'clone failed'}` }]); }
+                              setCloneImporting(false);
+                              setCloneImportUrl('');
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <button
+                          disabled={!cloneImportUrl.trim() || cloneImporting}
+                          onClick={async () => {
+                            if (!cloneImportUrl.trim()) return;
+                            setCloneImporting(true);
+                            setPanelTab('terminal');
+                            setCreatingIn(null);
+                            setShowCloneInput(false);
+                            try { await cloneRepoIntoWorkspace(cloneImportUrl.trim(), files); }
+                            catch (err) { setTermLines(p => [...p, { type: 'error', text: `fatal: ${err instanceof Error ? err.message : 'clone failed'}` }]); }
+                            setCloneImporting(false);
+                            setCloneImportUrl('');
+                          }}
+                          className="w-full py-1 text-[9px] rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white transition-colors">
+                          {cloneImporting ? 'Cloning…' : 'Clone Repository'}
+                        </button>
+                      </div>
+                    )}
+                    <button onClick={() => { setCreatingIn(null); setShowCloneInput(false); }} className="w-full text-[9px] text-white/30 hover:text-white/60 py-1">Cancel</button>
                   </div>
                 )}
               </div>
@@ -1202,14 +1446,22 @@ You MUST use <nexios_ops> to create or edit files. Never paste code in chat — 
                 <div ref={termEndRef} />
               </div>
               <div className="px-2 pt-1 border-t shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-                <div className="text-[9px] text-white/20 mb-1">ls · cat · touch · rm · pwd · echo · run · git clone &lt;url&gt; · help · clear</div>
+                <div className="text-[9px] text-white/20 mb-1">
+                  {termLoading
+                    ? '⚡ Running in sandbox…'
+                    : 'npm · node · python3 · pip3 · git clone <url> · run · help'}
+                </div>
               </div>
-              <div className="p-2 flex gap-2 shrink-0">
-                <span className="text-green-400 font-mono text-[11px] mt-1.5">$</span>
+              <div className="p-2 flex gap-2 shrink-0 items-center">
+                <span className={`font-mono text-[11px] ${termLoading ? 'text-yellow-400 animate-pulse' : 'text-green-400'}`}>$</span>
                 <input value={termInput} onChange={e => setTermInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && runTerminalCommand()}
-                  placeholder="Enter command…"
-                  className="flex-1 bg-transparent outline-none text-[11px] font-mono text-white/80" />
+                  placeholder={termLoading ? 'Running…' : 'Enter command…'}
+                  disabled={termLoading}
+                  className="flex-1 bg-transparent outline-none text-[11px] font-mono text-white/80 disabled:opacity-50" />
+                {termLoading && (
+                  <div className="w-3 h-3 border border-t-transparent border-yellow-400 rounded-full animate-spin shrink-0" />
+                )}
               </div>
             </div>
           )}
