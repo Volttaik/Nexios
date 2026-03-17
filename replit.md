@@ -2,7 +2,7 @@
 
 ## Overview
 
-Nexios AI is a Next.js 15 enterprise AI platform with MongoDB/JWT authentication, a multi-provider AI chat interface, VS Code-like code sandbox, and a full dashboard. Features Glass UI / Soft UI / Flat UI customization, background patterns, dark/light mode, and AI support for Gemini, Groq (free), OpenAI, Anthropic, and Mistral.
+Nexios AI is a Next.js 15 enterprise AI platform featuring a dark glass design system, user authentication, an AI chat assistant, and a full AI-powered coding workspace (IDE) with Monaco editor, file tree, AI code agent, sandbox terminal, GitHub import, and API search.
 
 ## User Preferences
 
@@ -12,98 +12,111 @@ Preferred communication style: Simple, everyday language.
 
 ### Tech Stack
 
-- **Framework**: Next.js 15 (App Router)
-- **Styling**: Tailwind CSS v4 + custom CSS variables (glass/soft/flat UI)
+- **Framework**: Next.js 15.5.12 (App Router)
+- **Styling**: Tailwind CSS v4 + CSS custom properties (dark glass design system)
 - **Database**: MongoDB (via Mongoose)
-- **Auth**: JWT tokens (jsonwebtoken + jose), bcryptjs for password hashing
-- **AI**: Multi-provider: Google Gemini (`@google/genai`), Groq (OpenAI-compat), OpenAI, Anthropic, Mistral
-- **Icons**: Inline SVGs throughout (no react-icons in dashboard/chat)
+- **Auth**: JWT tokens (jsonwebtoken + jose), bcryptjs
+- **Icons**: React Icons (hi/bs)
+- **Code Editor**: @monaco-editor/react (Monaco / VS Code editor)
 - **Language**: TypeScript
 
-### Key Features (Post-Overhaul)
+### Design System
 
-1. **Multi-provider AI**: Gemini, Groq (FREE — Llama 3.3, Mixtral, Gemma), OpenAI, Anthropic, Mistral
-2. **Glass UI / Soft UI / Flat UI**: Toggle via Settings → Appearance
-3. **Background Patterns**: None, Dots, Grid, Lines, Noise, Circuit
-4. **Redesigned Sidebar**: Always-dark (#07070a), collapsible, mobile-friendly with scroll lock
-5. **Chat Bubbles**: Gradient user bubbles (accent → accent2), card AI bubbles with rounded corners
-6. **AI Image Support**: Upload images to vision-capable models (Gemini, GPT-4o, Claude, Llama Vision)
-7. **Groq Free Fallback**: Automatically suggested when quota exceeded for paid providers
-8. **Login/Register**: Split-panel design, dark decorative left pane, clean form right pane
-9. **Projects**: Import files/JSON, search, VS Code-like sandbox
-10. **Mobile responsive**: Scroll lock on menu open, X button to close, menu button hides when sidebar open
+Dark glass theme defined in `app/globals.css`:
+- `--bg-primary: #080c14` — page background
+- `--accent: #818cf8` — indigo accent, glows/buttons
+- `--glass-border` — semi-transparent borders
+- `.glass` — glass card utility (backdrop-blur, semi-transparent bg)
+- `.btn-primary`, `.btn-ghost` — button utilities
+- `.input-base` — dark input with focus glow
+- Icons always placed on the **RIGHT** side of input fields
+- Animations: fadeIn, slideUp, scaleIn, glow, float
 
 ### Project Structure
 
 ```
 app/
-  layout.tsx               — Root layout with inline theme script (no flash)
-  globals.css              — Full design system: tokens, glass/soft/flat, patterns, animations
-  context/
-    ThemeContext.tsx        — theme (dark/light), uiStyle (flat/glass/soft), bgPattern
-    AIContext.tsx           — Multi-provider config: Gemini, Groq, OpenAI, Anthropic, Mistral
-  lib/
-    ai.ts                  — callAI() dispatcher for all 5 providers, quota error messages
-    mongodb.ts             — Mongoose connection helper
-    tokenUtils.ts          — JWT verify + URL token utilities
   api/
     login/route.ts         — POST /api/login
     register/route.ts      — POST /api/register
-    upload/route.ts        — POST /api/upload
   components/
-    Header.tsx             — Top navigation bar (public pages)
+    Header.tsx             — Public nav header
+    MenuDropdown.tsx       — Navigation dropdown
+    SubdomainHandler.tsx   — Subdomain detection
+    LoadingSpinner.tsx     — Loading spinner
+    ShareableLink.tsx      — Copy auth link
   dashboard/
-    layout.tsx             — Protected dashboard layout (body scroll lock, sidebar integration)
-    page.tsx               — Dashboard overview
-    chat/page.tsx          — AI chat (full-screen, fixed overlay, gradient bubbles)
-    analytics/page.tsx     — Usage analytics
-    documents/page.tsx     — Chat history as documents
-    settings/page.tsx      — Settings: API keys, UI style, bg patterns, danger zone
-    projects/page.tsx      — Projects grid: create, import (file/JSON), search, VS Code sandbox
+    layout.tsx             — Protected layout (auth check, dark bg)
+    page.tsx               — Dashboard overview with stats & activity
     components/
-      DashboardSidebar.tsx — Full sidebar: nav, AI model picker, projects, chats, user menu
-  login/page.tsx           — Split-panel login: dark features left, clean form right
-  register/page.tsx        — Split-panel register with all fields
+      DashboardHeader.tsx  — Fixed top bar with search & user
+      DashboardSidebar.tsx — Dark glass sidebar with Projects link
+      UserDropdown.tsx     — User profile dropdown
+    chat/page.tsx          — AI chat (Gemini-powered)
+    projects/
+      page.tsx             — Projects list (localStorage, GitHub import)
+      [id]/page.tsx        — Full AI workspace (Monaco + AI + Terminal + API search)
+  lib/
+    mongodb.ts             — Mongoose connection helper
+    tokenUtils.ts          — JWT utilities
   models/
     user.ts                — Mongoose User schema
+  types/
+    user.ts                — AppUser interface
+  login/page.tsx           — Dark glass login (icons RIGHT side)
+  register/page.tsx        — Dark glass register (icons RIGHT side)
+  page.tsx                 — Dark glass landing page (hero + features + CTA)
+  layout.tsx               — Root layout
+  globals.css              — Dark glass design system + Tailwind v4
 ```
 
-### CSS Variable System
+### Project Workspace Features (`/dashboard/projects/[id]`)
 
-```
-:root (light):  --bg, --bg2, --bg3, --border, --text, --text2, --text3, --accent, --accent2
-.dark:          same tokens with dark values
-.ui-glass:      frosted glass overrides (backdrop-filter blur)
-.ui-soft:       neumorphic shadow overrides
-.pattern-*:     background-image patterns (dots, grid, lines, noise, circuit)
-```
+- **File tree** — collapsible sidebar, create/delete files, folder expand
+- **Monaco editor** — VS Code editor with syntax highlighting, 40+ languages
+- **AI Code Agent** — Gemini-powered chat that reads workspace files, writes code to editor
+- **Terminal** — Browser-based terminal with: ls, cat, run, test, install, git status, clear
+- **Live Preview** — iframe preview for HTML/CSS/JS code
+- **GitHub Import** — fetches public repo files via GitHub REST API (max 20 files)
+- **API Search** — 12+ curated public APIs with category filter, one-click code snippets
+- **Panel system** — collapsible right panel (AI / APIs) and bottom panel (Terminal / Preview)
 
-### AI Providers
+### Environment Variables
 
-| Provider  | ID         | Free?  | Models                              |
-|-----------|------------|--------|-------------------------------------|
-| Gemini    | gemini     | Partial| 2.0 Flash, 1.5 Flash, 1.5 Pro       |
-| Groq      | groq       | YES    | Llama 3.3 70B, Llama 3.1 8B, Mixtral, Gemma2, Llama Vision |
-| OpenAI    | openai     | No     | GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 |
-| Anthropic | anthropic  | No     | Claude 3.5 Sonnet, 3.5 Haiku, 3 Haiku |
-| Mistral   | mistral    | No     | Mistral Large, Small, Codestral    |
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `MONGODB_URI` | MongoDB connection string | Yes (auth endpoints) |
+| `JWT_SECRET` | JWT signing secret | Yes (auto-generated) |
+| `NEXT_PUBLIC_GEMINI_API_KEY` | Google Gemini API key | Yes (AI features) |
 
-### Chat Bubble Design
+### Authentication Flow
 
-- **User**: `linear-gradient(135deg, var(--accent), var(--accent2))` with `border-radius: 20px 20px 4px 20px`
-- **AI**: `var(--bg2)` + border with `border-radius: 4px 20px 20px 20px`
+1. Register at `/register` → POST `/api/register` → stores hashed password → returns JWT
+2. Login at `/login` → POST `/api/login` → verifies password → returns JWT
+3. JWT stored in `localStorage` + cookie (`auth_token`)
+4. Dashboard `layout.tsx` checks localStorage; redirects to `/login` if absent
+5. Project workspace has its own full-screen layout (no dashboard shell)
 
-### Mobile Sidebar
+### Data Storage
 
-- Toggle button visible when closed, hidden when open
-- X button appears inside the sidebar panel to close
-- Body scroll locked via `document.body.classList.add('menu-open')` → `overflow: hidden`
-- Mobile overlay dims background with blur
+- **Users**: MongoDB (required for auth)
+- **Projects**: `localStorage` (`nexios_projects`)  
+- **Project files**: `localStorage` (`nexios_files_<id>`)
+- No backend required for projects — fully client-side
 
-## Running the App
+### Running the App
 
-```bash
-npm run dev
-```
+- **Dev server**: `npm run dev` (port 5000)
+- **Workflow**: "Start application"
 
-Runs on port 5000. JWT secret and MongoDB URI set in `.env` or Replit Secrets.
+### GitHub Repository
+
+- URL: `https://github.com/Volttaik/Nexios.git`
+- Push method: GitHub REST API (Replit git safety system blocks direct push)
+
+### Known Notes
+
+- Monaco editor uses `dynamic()` with `ssr: false` to avoid SSR issues
+- `NEXT_PUBLIC_GEMINI_API_KEY` must be set for AI agent features; fails gracefully without it
+- App works without MongoDB; auth endpoints fail gracefully with a clear error
+- `npm audit` reports 0 vulnerabilities (Next.js 15.5.12 security backport)
