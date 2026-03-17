@@ -9,7 +9,33 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* ── LIGHT MODE (default) ── */
   :root {
+    --bg-primary: #f4f6fb;
+    --bg-secondary: #edf0f7;
+    --bg-card: rgba(255, 255, 255, 0.85);
+    --bg-card-hover: rgba(255, 255, 255, 0.95);
+    --glass-border: rgba(0, 0, 0, 0.08);
+    --glass-border-hover: rgba(0, 0, 0, 0.16);
+    --text-primary: rgba(10, 14, 30, 0.92);
+    --text-secondary: rgba(10, 14, 30, 0.55);
+    --text-muted: rgba(10, 14, 30, 0.35);
+    --accent: #6366f1;
+    --accent-hover: #4f46e5;
+    --accent-glow: rgba(99, 102, 241, 0.18);
+    --danger: #ef4444;
+    --success: #10b981;
+    --input-bg: rgba(255, 255, 255, 0.9);
+    --input-border: rgba(0, 0, 0, 0.12);
+    --input-border-focus: rgba(99, 102, 241, 0.5);
+    --sidebar-w: 240px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.1), 0 2px 6px rgba(0,0,0,0.06);
+    --shadow-lg: 0 16px 40px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.08);
+  }
+
+  /* ── DARK MODE ── */
+  :root.dark {
     --bg-primary: #080c14;
     --bg-secondary: #0d1117;
     --bg-card: rgba(255, 255, 255, 0.04);
@@ -28,6 +54,50 @@
     --input-border: rgba(255, 255, 255, 0.1);
     --input-border-focus: rgba(129, 140, 248, 0.6);
     --sidebar-w: 240px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.5);
+    --shadow-lg: 0 16px 40px rgba(0,0,0,0.6);
+  }
+
+  /* ── UI STYLE: FLAT (default) ── */
+  :root.ui-flat {
+    --card-radius: 0.75rem;
+    --card-blur: 0px;
+    --card-bg: var(--bg-card);
+    --card-border: var(--glass-border);
+    --card-shadow: none;
+    --btn-shadow: none;
+  }
+
+  /* ── UI STYLE: GLASS ── */
+  :root.ui-glass {
+    --card-radius: 1rem;
+    --card-blur: 24px;
+    --card-bg: rgba(255, 255, 255, 0.06);
+    --card-border: rgba(255, 255, 255, 0.12);
+    --card-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+    --btn-shadow: 0 4px 12px var(--accent-glow);
+  }
+
+  :root.ui-glass .glass {
+    backdrop-filter: blur(var(--card-blur, 24px));
+    -webkit-backdrop-filter: blur(var(--card-blur, 24px));
+  }
+
+  /* ── UI STYLE: SOFT ── */
+  :root.ui-soft {
+    --card-radius: 1.25rem;
+    --card-blur: 0px;
+    --btn-shadow: 0 6px 20px var(--accent-glow);
+  }
+
+  :root.ui-soft .glass {
+    box-shadow: var(--shadow-md);
+    border-color: transparent;
+  }
+
+  :root.ui-soft button, :root.ui-soft a {
+    border-radius: 999px !important;
   }
 
   html { scroll-behavior: smooth; }
@@ -39,6 +109,7 @@
     color: var(--text-primary);
     line-height: 1.5;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -85,6 +156,7 @@
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     border: 1px solid var(--glass-border);
+    transition: background 0.2s, border-color 0.2s;
   }
 
   .glass-hover:hover {
@@ -112,10 +184,9 @@
   .input-base:focus {
     border-color: var(--input-border-focus);
     box-shadow: 0 0 0 3px var(--accent-glow);
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--input-bg);
   }
 
-  /* Input with icon on right */
   .input-icon-right {
     padding-right: 2.75rem;
   }
@@ -138,7 +209,7 @@
 
   .btn-primary:hover {
     background: var(--accent-hover);
-    box-shadow: 0 0 32px rgba(129, 140, 248, 0.4);
+    box-shadow: 0 0 32px rgba(99, 102, 241, 0.4);
     transform: translateY(-1px);
   }
 
@@ -167,7 +238,7 @@
   /* Glow accent text */
   .text-accent { color: var(--accent); }
   .text-gradient {
-    background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+    background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -237,17 +308,17 @@
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(127, 127, 127, 0.2);
     border-radius: 99px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(127, 127, 127, 0.35);
   }
 
   /* Selection */
   ::selection {
     background: var(--accent-glow);
-    color: white;
+    color: var(--text-primary);
   }
 
   /* Focus */
@@ -259,14 +330,14 @@
   /* Grid bg */
   .bg-grid {
     background-image:
-      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      linear-gradient(var(--glass-border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--glass-border) 1px, transparent 1px);
     background-size: 48px 48px;
   }
 
   /* Dot bg */
   .bg-dots {
-    background-image: radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px);
+    background-image: radial-gradient(var(--glass-border-hover) 1px, transparent 1px);
     background-size: 24px 24px;
   }
 
@@ -281,6 +352,26 @@
   .terminal-error { color: #f87171; }
   .terminal-success { color: #34d399; }
   .terminal-info { color: #60a5fa; }
+
+  /* Background patterns */
+  :root.pattern-dots body {
+    background-image: radial-gradient(var(--glass-border) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  :root.pattern-grid body {
+    background-image:
+      linear-gradient(var(--glass-border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--glass-border) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  :root.pattern-lines body {
+    background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 23px,
+      var(--glass-border) 24px
+    );
+  }
 }
 
 /* Remove number spinners */
@@ -288,8 +379,12 @@ input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 input[type=number] { -moz-appearance: textfield; }
 
-/* Date input dark mode */
+/* Date input */
 input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1) opacity(0.4);
+  filter: opacity(0.4);
   cursor: pointer;
+}
+
+:root.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(0.4);
 }
