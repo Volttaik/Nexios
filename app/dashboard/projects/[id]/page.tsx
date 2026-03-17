@@ -792,6 +792,9 @@ export default function ProjectWorkspace() {
     const parts = cmd.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
     const command = parts[0];
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b1afbf2 (Enhance project import and execution with AI and terminal improvements)
     const args = parts.slice(1).map((a: string) => a.replace(/^['"]|['"]$/g, ''));
 
     // ── Real shell commands — route to sandbox API ──
@@ -818,9 +821,12 @@ export default function ProjectWorkspace() {
       setTermLoading(false);
       return;
     }
+<<<<<<< HEAD
 =======
     const args = parts.slice(1).map(a => a.replace(/^['"]|['"]$/g, ''));
 >>>>>>> 9fbf77f (Improve user interface and add theme customization options)
+=======
+>>>>>>> b1afbf2 (Enhance project import and execution with AI and terminal improvements)
 
     if (command === 'ls') {
       const paths = getAllFilePaths(files);
@@ -844,6 +850,7 @@ export default function ProjectWorkspace() {
       setTermLines([]);
     } else if (command === 'run') {
       runProject();
+<<<<<<< HEAD
 <<<<<<< HEAD
       setTermLines(p => [...p, { type: 'success', text: 'Starting project…' }]);
     } else if (command === 'help') {
@@ -887,59 +894,52 @@ export default function ProjectWorkspace() {
       setTermLines(p => [...p, { type: 'output', text: new Date().toString() }]);
 =======
       setTermLines(p => [...p, { type: 'success', text: 'Opening project preview...' }]);
+=======
+      setTermLines(p => [...p, { type: 'success', text: 'Starting project…' }]);
+>>>>>>> b1afbf2 (Enhance project import and execution with AI and terminal improvements)
     } else if (command === 'help') {
-      ['ls              list files', 'cat <file>      show file contents', 'touch <file>    create file',
-        'rm <file>       delete file', 'pwd             print working directory', 'echo <text>     print text',
-        'run             run project preview', 'git clone <url> import GitHub repository', 'clear           clear terminal'
+      [
+        'Built-in commands:',
+        '  ls                   list workspace files',
+        '  cat <file>           show file contents',
+        '  touch <file>         create empty file',
+        '  rm <file>            delete file',
+        '  pwd                  print directory',
+        '  echo <text>          print text',
+        '  run                  run project (auto-detects language)',
+        '  git clone <url>      import GitHub repository',
+        '  clear                clear terminal',
+        '',
+        'Real sandbox commands (run on Linux):',
+        '  npm install          install Node.js dependencies',
+        '  npm run dev          start dev server',
+        '  npm run build        build project',
+        '  node <file>          run JavaScript file',
+        '  python3 <file>       run Python script',
+        '  pip3 install <pkg>   install Python package',
+        '  npx <tool>           run any npm package',
       ].forEach(line => setTermLines(p => [...p, { type: 'output', text: line }]));
     } else if (command === 'git' && args[0] === 'clone' && args[1]) {
-      const repoUrl = args[1];
-      const match = repoUrl.match(/github\.com\/([^/]+)\/([^/\s.]+)/);
-      if (!match) {
-        setTermLines(p => [...p, { type: 'error', text: 'git clone: only GitHub URLs are supported (https://github.com/owner/repo)' }]);
-        return;
-      }
-      const [, owner, repo] = match;
-      setTermLines(p => [...p, { type: 'output', text: `Cloning into '${repo}'…` }]);
-      setTermLines(p => [...p, { type: 'output', text: 'remote: Enumerating objects…' }]);
       try {
-        const treeResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`);
-        if (!treeResp.ok) {
-          const errData = await treeResp.json().catch(() => ({}));
-          setTermLines(p => [...p, { type: 'error', text: `fatal: ${errData.message || 'repository not found or is private'}` }]);
-          return;
-        }
-        const treeData = await treeResp.json();
-        const fileItems = (treeData.tree as any[]).filter(item => item.type === 'blob' && item.size < 500000);
-        setTermLines(p => [...p, { type: 'output', text: `remote: Total ${fileItems.length} files, fetching…` }]);
-
-        let fetched = 0;
-        let newFiles = [...files];
-        const BATCH = 6;
-        for (let i = 0; i < fileItems.length; i += BATCH) {
-          const batch = fileItems.slice(i, i + BATCH);
-          await Promise.all(batch.map(async (item: any) => {
-            try {
-              const contentResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${item.path}`);
-              if (!contentResp.ok) return;
-              const contentData = await contentResp.json();
-              if (contentData.content) {
-                const decoded = atob(contentData.content.replace(/\n/g, ''));
-                newFiles = addFileByPath(newFiles, item.path, decoded);
-                fetched++;
-              }
-            } catch { /* skip binary/large files */ }
-          }));
-          setTermLines(p => [...p, { type: 'output', text: `  ${Math.min(i + BATCH, fileItems.length)}/${fileItems.length} files fetched…` }]);
-        }
-        setFiles(newFiles);
-        const paths = getAllFilePaths(newFiles);
-        if (paths.length) setSelectedPath(paths[0]);
-        setTermLines(p => [...p, { type: 'success', text: `✓ Cloned ${repo}: ${fetched} files imported into workspace` }]);
+        await cloneRepoIntoWorkspace(args[1], files);
       } catch (err) {
         setTermLines(p => [...p, { type: 'error', text: `fatal: ${err instanceof Error ? err.message : 'network error'}` }]);
       }
+<<<<<<< HEAD
 >>>>>>> 9fbf77f (Improve user interface and add theme customization options)
+=======
+    } else if (command === 'git') {
+      setTermLines(p => [...p, { type: 'output', text: 'git: supported commands: clone <url>' }]);
+    } else if (command === 'which') {
+      const tools: Record<string, string> = { node: '/usr/bin/node', npm: '/usr/bin/npm', python3: '/usr/bin/python3', python: '/usr/bin/python3', pip3: '/usr/bin/pip3' };
+      setTermLines(p => [...p, { type: 'output', text: tools[args[0]] || `${args[0]}: not found` }]);
+    } else if (command === 'uname') {
+      setTermLines(p => [...p, { type: 'output', text: 'Linux nexios-sandbox 6.1.0 #1 SMP x86_64 GNU/Linux' }]);
+    } else if (command === 'whoami') {
+      setTermLines(p => [...p, { type: 'output', text: 'nexios' }]);
+    } else if (command === 'date') {
+      setTermLines(p => [...p, { type: 'output', text: new Date().toString() }]);
+>>>>>>> b1afbf2 (Enhance project import and execution with AI and terminal improvements)
     } else {
       setTermLines(p => [...p, { type: 'error', text: `${command}: command not found — type 'help' for available commands` }]);
     }
@@ -1507,14 +1507,20 @@ You MUST use <nexios_ops> to create or edit files. Never paste code in chat — 
               </div>
               <div className="px-2 pt-1 border-t shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b1afbf2 (Enhance project import and execution with AI and terminal improvements)
                 <div className="text-[9px] text-white/20 mb-1">
                   {termLoading
                     ? '⚡ Running in sandbox…'
                     : 'npm · node · python3 · pip3 · git clone <url> · run · help'}
                 </div>
+<<<<<<< HEAD
 =======
                 <div className="text-[9px] text-white/20 mb-1">ls · cat · touch · rm · pwd · echo · run · git clone &lt;url&gt; · help · clear</div>
 >>>>>>> 9fbf77f (Improve user interface and add theme customization options)
+=======
+>>>>>>> b1afbf2 (Enhance project import and execution with AI and terminal improvements)
               </div>
               <div className="p-2 flex gap-2 shrink-0 items-center">
                 <span className={`font-mono text-[11px] ${termLoading ? 'text-yellow-400 animate-pulse' : 'text-green-400'}`}>$</span>
