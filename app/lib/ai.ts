@@ -25,6 +25,7 @@ export async function callAI(
     case 'openai':    return callOpenAI(model, messages, apiKey);
     case 'anthropic': return callAnthropic(model, messages, apiKey);
     case 'mistral':   return callMistral(model, messages, apiKey);
+    case 'xai':       return callXAI(model, messages, apiKey);
     default:          return callGemini(model, messages, apiKey);
   }
 }
@@ -72,7 +73,7 @@ async function callGemini(model: string, messages: ChatMessage[], apiKey: string
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes('API_KEY_INVALID') || msg.includes('API key')) return '⚠️ **Invalid Gemini API key.** Check your key in Settings → AI Providers.';
     if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota') || msg.includes('429')) {
-      return '⚠️ **Gemini quota exceeded.** You can switch to **Groq** (free) in the model selector — it has generous free limits with Llama 3.3, Mixtral, and more.';
+      return '⚠️ **Gemini quota exceeded.** Switch to **Groq** (free) in the model selector — Llama 3.3, Mixtral, and more at no cost.';
     }
     if (msg.includes('model')) return `⚠️ Model "${model}" unavailable. Try a different Gemini model.`;
     return `⚠️ Gemini error: ${msg}`;
@@ -80,7 +81,7 @@ async function callGemini(model: string, messages: ChatMessage[], apiKey: string
 }
 
 async function callGroq(model: string, messages: ChatMessage[], apiKey: string): Promise<string> {
-  if (!apiKey) return '⚠️ **Groq API key needed.** Get your free key at [console.groq.com](https://console.groq.com) — it\'s 100% free with generous limits!';
+  if (!apiKey) return '⚠️ **Groq API key needed.** Get your free key at [console.groq.com](https://console.groq.com) — 100% free with generous limits!';
   try {
     const formattedMessages = messages.map(m => {
       if (m.role === 'user' && m.imageBase64List?.length && model.includes('vision')) {
@@ -100,30 +101,22 @@ async function callGroq(model: string, messages: ChatMessage[], apiKey: string):
 
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: formattedMessages,
-        max_tokens: 4096,
-        temperature: 0.7,
-      }),
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages: formattedMessages, max_tokens: 4096, temperature: 0.7 }),
     });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       const errMsg = err.error?.message || `HTTP ${res.status}`;
       if (res.status === 401) return '⚠️ **Invalid Groq API key.** Get your free key at console.groq.com';
-      if (res.status === 429) return '⚠️ **Groq rate limit hit.** Wait a moment and try again, or switch to a different Groq model.';
+      if (res.status === 429) return '⚠️ **Groq rate limit hit.** Wait a moment and try again, or switch to a different model.';
       throw new Error(errMsg);
     }
     const data = await res.json();
     return data.choices?.[0]?.message?.content || 'No response generated.';
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('Failed to fetch') || msg.includes('network')) return '⚠️ **Network error** connecting to Groq. Check your internet connection.';
+    if (msg.includes('Failed to fetch') || msg.includes('network')) return '⚠️ **Network error** connecting to Groq. Check your connection.';
     return `⚠️ Groq error: ${msg}`;
   }
 }
@@ -148,7 +141,7 @@ async function callOpenAI(model: string, messages: ChatMessage[], apiKey: string
         }
         return { role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content };
       }),
-      max_tokens: 2048,
+      max_tokens: 4096,
     };
 
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -166,9 +159,7 @@ async function callOpenAI(model: string, messages: ChatMessage[], apiKey: string
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes('401') || msg.includes('Incorrect API key')) return '⚠️ **Invalid OpenAI API key.** Check your key in Settings → AI Providers.';
-    if (msg.includes('429') || msg.includes('quota') || msg.includes('insufficient_quota')) {
-      return '⚠️ **OpenAI quota exceeded.** Switch to **Groq** (free) for Llama 3.3, Mixtral, and more with no cost.';
-    }
+    if (msg.includes('429') || msg.includes('quota') || msg.includes('insufficient_quota')) return '⚠️ **OpenAI quota exceeded.** Switch to **Groq** (free) for Llama 3.3, Mixtral, and more.';
     return `⚠️ OpenAI error: ${msg}`;
   }
 }
@@ -203,7 +194,7 @@ async function callAnthropic(model: string, messages: ChatMessage[], apiKey: str
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
       },
-      body: JSON.stringify({ model, messages: anthropicMessages, max_tokens: 2048 }),
+      body: JSON.stringify({ model, messages: anthropicMessages, max_tokens: 4096 }),
     });
 
     if (!res.ok) {
@@ -229,7 +220,7 @@ async function callMistral(model: string, messages: ChatMessage[], apiKey: strin
       body: JSON.stringify({
         model,
         messages: messages.map(m => ({ role: m.role, content: m.content })),
-        max_tokens: 2048,
+        max_tokens: 4096,
       }),
     });
 
@@ -244,6 +235,55 @@ async function callMistral(model: string, messages: ChatMessage[], apiKey: strin
     if (msg.includes('401')) return '⚠️ **Invalid Mistral API key.** Check your key in Settings → AI Providers.';
     if (msg.includes('429')) return '⚠️ **Mistral rate limit exceeded.** Try Groq (free) as an alternative.';
     return `⚠️ Mistral error: ${msg}`;
+  }
+}
+
+async function callXAI(model: string, messages: ChatMessage[], apiKey: string): Promise<string> {
+  if (!apiKey) return '⚠️ **xAI API key required.** Get your key at [console.x.ai](https://console.x.ai) and add it in Settings → AI Providers.';
+  try {
+    const formattedMessages = messages.map(m => {
+      if (m.role === 'user' && m.imageBase64List?.length && model.includes('vision')) {
+        return {
+          role: 'user',
+          content: [
+            { type: 'text', text: m.content || 'Describe this image.' },
+            ...m.imageBase64List.map(img => ({
+              type: 'image_url',
+              image_url: { url: img.startsWith('data:') ? img : `data:image/jpeg;base64,${img}` },
+            })),
+          ],
+        };
+      }
+      return { role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content };
+    });
+
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: formattedMessages,
+        max_tokens: 4096,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const errMsg = err.error?.message || `HTTP ${res.status}`;
+      if (res.status === 401) return '⚠️ **Invalid xAI API key.** Get your key at console.x.ai';
+      if (res.status === 429) return '⚠️ **xAI rate limit hit.** Wait a moment and try again.';
+      throw new Error(errMsg);
+    }
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content || 'No response generated.';
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('Failed to fetch') || msg.includes('network')) return '⚠️ **Network error** connecting to xAI. Check your connection.';
+    return `⚠️ xAI Grok error: ${msg}`;
   }
 }
 
