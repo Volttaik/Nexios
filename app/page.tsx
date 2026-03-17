@@ -3,9 +3,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { HiArrowRight, HiLightningBolt, HiCode, HiChip, HiGlobe } from 'react-icons/hi';
-import { BsRobot, BsCpu, BsBarChart, BsShieldCheck, BsStars, BsTerminal, BsGithub } from 'react-icons/bs';
-import Image from 'next/image';
+import { HiArrowRight, HiCode, HiGlobe } from 'react-icons/hi';
+import { BsRobot, BsCpu, BsBarChart, BsStars, BsTerminal, BsGithub } from 'react-icons/bs';
 
 const NAV_LINKS = ['Features', 'Pricing', 'Docs', 'Blog'];
 
@@ -141,7 +140,7 @@ export default function Home() {
                   <div className="ml-4"><span style={{ color: '#94a3b8' }}>sandbox</span>: <span style={{ color: '#818cf8' }}>true</span>,</div>
                   <div className="ml-4"><span style={{ color: '#94a3b8' }}>tools</span>: [<span style={{ color: '#fbbf24' }}>&apos;fs&apos;</span>, <span style={{ color: '#fbbf24' }}>&apos;terminal&apos;</span>, <span style={{ color: '#fbbf24' }}>&apos;github&apos;</span>]</div>
                   <div>{'}'});</div>
-                  <div className="mt-3"><span style={{ color: '#94a3b8' }}>// Agent writes & runs code autonomously</span></div>
+                  <div className="mt-3"><span style={{ color: '#94a3b8' }}>{'// Agent writes & runs code autonomously'}</span></div>
                   <div><span style={{ color: '#818cf8' }}>await</span> agent.<span style={{ color: '#60a5fa' }}>run</span>(<span style={{ color: '#fbbf24' }}>&apos;Build a REST API with auth&apos;</span>);</div>
                   <div className="mt-1 flex items-center gap-1.5"><span className="animate-blink" style={{ color: 'var(--accent)' }}>▋</span></div>
                 </div>
