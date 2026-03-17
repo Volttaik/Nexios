@@ -61,11 +61,16 @@ export default function DashboardSidebar({ isOpen, user, isMobileOpen, onMobileC
     <>
       {/* Mobile overlay */}
       {isMobileOpen && (
+<<<<<<< HEAD
         <div
           className="fixed inset-0 z-30 md:hidden"
           style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
           onClick={onMobileClose}
         />
+=======
+        <div className="fixed inset-0 z-30 md:hidden" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+          onClick={onMobileClose} />
+>>>>>>> 9fbf77f (Improve user interface and add theme customization options)
       )}
 
       <aside
@@ -73,20 +78,33 @@ export default function DashboardSidebar({ isOpen, user, isMobileOpen, onMobileC
           ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
           ${isOpen ? 'md:translate-x-0' : 'md:-translate-x-full'}
         `}
+<<<<<<< HEAD
         style={{
           background: 'var(--bg-secondary)',
           backdropFilter: 'blur(24px)',
           borderRight: '1px solid var(--glass-border)',
         }}
       >
+=======
+        style={{ background: 'var(--bg-secondary)', backdropFilter: 'blur(24px)', borderRight: '1px solid var(--glass-border)' }}>
+
+>>>>>>> 9fbf77f (Improve user interface and add theme customization options)
         {/* Logo */}
         <div className="h-14 flex items-center px-4 shrink-0" style={{ borderBottom: '1px solid var(--glass-border)' }}>
           <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--accent)', boxShadow: '0 0 12px var(--accent-glow)' }}>
             <BsRobot className="w-4 h-4 text-white" />
           </div>
+<<<<<<< HEAD
           <span className="ml-2.5 text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
             Nexios<span style={{ color: 'var(--accent)' }}>AI</span>
           </span>
+=======
+          {isOpen && (
+            <span className="ml-2.5 text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+              Nexios<span style={{ color: 'var(--accent)' }}>AI</span>
+            </span>
+          )}
+>>>>>>> 9fbf77f (Improve user interface and add theme customization options)
         </div>
 
         {/* Nav */}
@@ -111,12 +129,28 @@ export default function DashboardSidebar({ isOpen, user, isMobileOpen, onMobileC
               >
                 {active && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full" style={{ background: 'var(--accent)' }} />}
                 <Icon className="w-4 h-4 shrink-0" />
+<<<<<<< HEAD
                 <span className="text-sm font-medium truncate flex-1">{item.label}</span>
                 {item.badge && (
+=======
+                {isOpen && (
+                  <span className="text-sm font-medium truncate flex-1">{item.label}</span>
+                )}
+                {isOpen && item.badge && (
+>>>>>>> 9fbf77f (Improve user interface and add theme customization options)
                   <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}>
                     {item.badge}
                   </span>
                 )}
+<<<<<<< HEAD
+=======
+                {!isOpen && (
+                  <div className="absolute left-full ml-3 px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50"
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', boxShadow: 'var(--shadow-md)' }}>
+                    {item.label}
+                  </div>
+                )}
+>>>>>>> 9fbf77f (Improve user interface and add theme customization options)
               </Link>
             );
           })}
@@ -130,10 +164,19 @@ export default function DashboardSidebar({ isOpen, user, isMobileOpen, onMobileC
                 style={{ background: 'linear-gradient(135deg, #6366f1, #818cf8)' }}>
                 {user.fullName?.[0]?.toUpperCase() || 'U'}
               </div>
+<<<<<<< HEAD
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{user.fullName}</p>
                 <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{user.email}</p>
               </div>
+=======
+              {isOpen && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{user.fullName}</p>
+                  <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{user.email}</p>
+                </div>
+              )}
+>>>>>>> 9fbf77f (Improve user interface and add theme customization options)
             </div>
           </div>
         )}

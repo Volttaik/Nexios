@@ -1,7 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+<<<<<<< HEAD
 import { HiBell, HiOutlineMenuAlt2, HiSearch, HiSun, HiMoon, HiX } from 'react-icons/hi';
+=======
+import { HiBell, HiOutlineMenuAlt2, HiSearch, HiSun, HiMoon } from 'react-icons/hi';
+>>>>>>> 9fbf77f (Improve user interface and add theme customization options)
 import UserDropdown from './UserDropdown';
 import type { AppUser } from '@/app/types/user';
 import { useTheme } from '@/app/context/ThemeContext';
@@ -18,10 +22,18 @@ interface DashboardHeaderProps {
 export default function DashboardHeader({ toggleSidebar, isSidebarOpen, user, onLogout, onMobileMenuOpen }: DashboardHeaderProps) {
   const [searchFocused, setSearchFocused] = useState(false);
   const { isDark, toggleTheme } = useTheme();
+<<<<<<< HEAD
 
   return (
     <header
       className={`fixed top-0 right-0 h-14 z-30 flex items-center px-4 gap-3 transition-all duration-300 ${isSidebarOpen ? 'left-0 md:left-60' : 'left-0'}`}
+=======
+
+  const sidebarOffset = isSidebarOpen ? 'md:left-60' : 'md:left-[72px]';
+
+  return (
+    <header className={`fixed top-0 right-0 left-0 ${sidebarOffset} h-14 z-30 flex items-center px-4 gap-3 transition-all duration-300`}
+>>>>>>> 9fbf77f (Improve user interface and add theme customization options)
       style={{ background: 'var(--bg-secondary)', backdropFilter: 'blur(24px)', borderBottom: '1px solid var(--glass-border)', WebkitBackdropFilter: 'blur(24px)' }}>
 
       {/* Mobile menu button */}
@@ -51,7 +63,11 @@ export default function DashboardHeader({ toggleSidebar, isSidebarOpen, user, on
           onBlur={() => setSearchFocused(false)}
           className="w-full pl-9 pr-4 py-2 text-xs rounded-xl transition-all outline-none"
           style={{
+<<<<<<< HEAD
             background: 'var(--input-bg)',
+=======
+            background: searchFocused ? 'var(--input-bg)' : 'var(--input-bg)',
+>>>>>>> 9fbf77f (Improve user interface and add theme customization options)
             border: `1px solid ${searchFocused ? 'var(--input-border-focus)' : 'var(--input-border)'}`,
             color: 'var(--text-primary)',
             boxShadow: searchFocused ? '0 0 0 3px var(--accent-glow)' : 'none',

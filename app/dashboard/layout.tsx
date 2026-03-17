@@ -15,6 +15,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<AppUser | null>(null);
   const subdomain = useSubdomain();
 
+<<<<<<< HEAD
+=======
+  // Project workspace gets its own full-screen layout — match /dashboard/projects/[any-id]
+>>>>>>> 9fbf77f (Improve user interface and add theme customization options)
   const isWorkspace = /\/dashboard\/projects\/[^/]+/.test(pathname || '');
 
   useEffect(() => {
