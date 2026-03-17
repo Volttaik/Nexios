@@ -12,6 +12,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [tempKey, setTempKey] = useState('');
+  const [autonomousMode, setAutonomousMode] = useState(false);
   const profileInputRef = useRef<HTMLInputElement>(null);
   const { settings, updateProviderConfig, setActiveProvider, setActiveModel, getApiKey } = useAI();
   const { isDark, toggleTheme, uiStyle, setUIStyle, bgPattern, setBGPattern } = useTheme();
@@ -22,7 +23,17 @@ export default function SettingsPage() {
     if (u) setUser(JSON.parse(u));
     const pic = localStorage.getItem('profilePicture');
     if (pic) setProfilePic(pic);
+    const auto = localStorage.getItem('nexios_autonomous_mode');
+    if (auto) setAutonomousMode(auto === 'true');
   }, []);
+
+  const toggleAutonomousMode = () => {
+    const next = !autonomousMode;
+    setAutonomousMode(next);
+    localStorage.setItem('nexios_autonomous_mode', String(next));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
 
   const handleProfilePicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -216,6 +227,42 @@ export default function SettingsPage() {
             );
           })}
         </div>
+      </div>
+
+      {/* Autonomous Mode */}
+      <div className="rounded-2xl border p-5 space-y-4" style={{ borderColor: autonomousMode ? 'rgba(251,191,36,0.35)' : 'var(--border)', background: autonomousMode ? 'rgba(251,191,36,0.04)' : 'var(--bg2)' }}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>Autonomous Mode</span>
+              {autonomousMode && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24' }}>⚡ ACTIVE</span>
+              )}
+            </div>
+            <p className="text-xs leading-relaxed" style={{ color: 'var(--text2)' }}>
+              Gives Nexios AI full awareness of its own code and capabilities. In this mode the AI can analyze its own logic, propose self-improvements, and adapt its behavior to overcome limitations — exactly like an advanced coding agent.
+            </p>
+            {autonomousMode && (
+              <p className="text-xs mt-2 font-medium" style={{ color: '#fbbf24' }}>
+                ⚡ Active in all workspaces. The AI can now reason about and rewrite its own behavior.
+              </p>
+            )}
+          </div>
+          <button onClick={toggleAutonomousMode}
+            className="relative w-12 h-6 rounded-full transition-colors shrink-0 mt-0.5"
+            style={{ background: autonomousMode ? '#f59e0b' : 'var(--bg3)' }}>
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${autonomousMode ? 'translate-x-6' : 'translate-x-0'}`} />
+          </button>
+        </div>
+        {autonomousMode && (
+          <div className="rounded-xl p-3 text-xs leading-relaxed space-y-1" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.15)', color: 'rgba(251,191,36,0.8)' }}>
+            <p className="font-semibold">What autonomous mode enables:</p>
+            <p>• The AI sees its own system prompt and decision logic</p>
+            <p>• It can reason about why it made choices and refine them</p>
+            <p>• It can propose new rules for itself when it hits limitations</p>
+            <p>• Self-modification is sandboxed to prompt-level — not code execution</p>
+          </div>
+        )}
       </div>
 
       {/* Appearance */}

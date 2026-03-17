@@ -72,17 +72,24 @@ app/
 
 ### Project Workspace Features (`/dashboard/projects/[id]`)
 
-**4-Agent System:**
-- **Agent 1 (User Agent)**: Handles all user interaction — the only agent the user talks to directly
-- **Agent 2 (Environment Agent)**: Works in the background, edits/creates files live as instructed
-- **Agent 3 (Coordinator)**: Analyses Agent 1's response, extracts file operations, routes to Agent 2
-- **Agent 4 (Checker)**: Validates all file operations and agent sync after each action
+**Unified AI Agent System:**
+The user sees one AI: "Nexios AI". Internally, three background processes work together transparently:
+- **Conversational layer**: handles the natural language response shown in chat
+- **Coding Agent**: parses AI-output `<nexios_ops>` JSON blocks and directly creates, edits, or deletes files in the workspace — no code shown in chat
+- **Coordinator**: extracts structured file operations from the AI response and routes them to the Coding Agent silently
+
+The AI outputs structured `<nexios_ops>[{op, path, content}]</nexios_ops>` blocks alongside text. The ops are stripped from the chat and executed immediately. Files appear in the tree automatically.
+
+**Autonomous Mode** (toggled in Settings):
+- Gives the AI awareness of its own logic and system prompt
+- The AI can reason about its own limitations and propose self-improvements
+- Indicated by a `⚡ AUTONOMOUS` badge in the workspace top bar
 
 **UI Panels:**
-- **Left sidebar** — File tree (Agent 2's working area), collapsible, create/delete/rename files
+- **Left sidebar** — File tree, collapsible, create/delete/rename files
 - **Center content** — 4 tabs: Code (Monaco editor), Files list, Design canvas, Document editor
-- **Right panel** — 3 tabs: Chat (Agent 1), Agents (all 4 agent status + logs), Terminal (env shell)
-- **Top bar** — Project name, type badge, all 4 agent badges, export button, model selector
+- **Right panel** — 2 tabs: Chat (single unified AI), Terminal (workspace shell)
+- **Top bar** — Project name, type badge, single Nexios AI status indicator, export, model selector
 
 **Content Modes:**
 - **Code**: Monaco editor with syntax highlighting, 40+ languages
