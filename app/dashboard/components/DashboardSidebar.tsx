@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BsRobot, BsGrid, BsChatDots, BsCode, BsBarChart, BsGear } from 'react-icons/bs';
+import { BsRobot, BsGrid, BsChatDots, BsBarChart, BsGear } from 'react-icons/bs';
 import { HiFolder } from 'react-icons/hi';
 import type { AppUser } from '@/app/types/user';
 
