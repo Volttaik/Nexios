@@ -63,12 +63,6 @@ export default function Home() {
               onMouseOut={e => (e.currentTarget.style.color = 'var(--text-secondary)')}>{l}</Link>
           ))}
         </div>
-        <div className="flex items-center gap-2 ml-auto">
-          <Link href="/login" className="btn-ghost text-[11px] py-1 px-2.5">Sign In</Link>
-          <button onClick={goRegister} className="btn-primary text-[11px] py-1 px-2.5">
-            Get Started <HiArrowRight className="w-3 h-3" />
-          </button>
-        </div>
       </nav>
 
       {/* Hero */}
