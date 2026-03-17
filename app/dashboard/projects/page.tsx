@@ -1,277 +1,307 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import type { Project } from '../components/DashboardSidebar';
+import { BsCode, BsGithub, BsTrash, BsThreeDotsVertical, BsPlus } from 'react-icons/bs';
+import { HiFolder, HiSearch, HiArrowRight, HiLightningBolt, HiX } from 'react-icons/hi';
+
+interface Project {
+  id: string;
+  name: string;
+  description: string;
+  language: string;
+  createdAt: string;
+  lastModified: string;
+  files: number;
+  githubUrl?: string;
+}
 
 const LANG_COLORS: Record<string, string> = {
-  javascript: '#f7df1e', typescript: '#3178c6', python: '#3776ab',
-  rust: '#ce412b', go: '#00add8', html: '#e34f26', css: '#1572b6',
-};
-const LANG_LABELS: Record<string, string> = {
-  javascript: 'JS', typescript: 'TS', python: 'PY',
-  rust: 'RS', go: 'GO', html: 'HTML', css: 'CSS',
-};
-const DEFAULT_CONTENT: Record<string, string> = {
-  javascript: '// Hello World\nconsole.log("Hello, World!");\n',
-  typescript: 'const greeting: string = "Hello, World!";\nconsole.log(greeting);\n',
-  python: '# Hello World\nprint("Hello, World!")\n',
-  rust: 'fn main() {\n    println!("Hello, World!");\n}\n',
-  go: 'package main\nimport "fmt"\nfunc main() {\n    fmt.Println("Hello, World!")\n}\n',
-  html: '<!DOCTYPE html>\n<html>\n<head><title>My Page</title></head>\n<body>\n  <h1>Hello, World!</h1>\n</body>\n</html>\n',
-  css: '/* Styles */\nbody {\n  margin: 0;\n  font-family: sans-serif;\n}\n',
+  TypeScript: '#818cf8',
+  JavaScript: '#f59e0b',
+  Python: '#34d399',
+  Rust: '#f87171',
+  Go: '#60a5fa',
+  HTML: '#fb923c',
+  CSS: '#a78bfa',
+  Other: '#94a3b8',
 };
 
-function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+const SAMPLE_PROJECTS: Project[] = [
+  { id: 'proj-1', name: 'my-api-project', description: 'REST API with authentication and rate limiting', language: 'TypeScript', createdAt: '2025-03-15', lastModified: '2h ago', files: 12 },
+  { id: 'proj-2', name: 'ml-pipeline', description: 'Machine learning data pipeline with PyTorch', language: 'Python', createdAt: '2025-03-14', lastModified: '1d ago', files: 8 },
+  { id: 'proj-3', name: 'react-dashboard', description: 'Analytics dashboard with real-time charts', language: 'JavaScript', createdAt: '2025-03-12', lastModified: '3d ago', files: 24 },
+];
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [mounted, setMounted] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const [name, setName] = useState('');
-  const [desc, setDesc] = useState('');
-  const [lang, setLang] = useState('javascript');
   const [search, setSearch] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [showGithub, setShowGithub] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  const [newLang, setNewLang] = useState('TypeScript');
+  const [githubUrl, setGithubUrl] = useState('');
   const [importing, setImporting] = useState(false);
-  const importRef = useRef<HTMLInputElement>(null);
-  const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
   useEffect(() => {
-    setMounted(true);
-    const saved = localStorage.getItem('nexios-projects');
-    if (saved) { try { setProjects(JSON.parse(saved)); } catch { /* ignore */ } }
+    const saved = localStorage.getItem('nexios_projects');
+    if (saved) {
+      setProjects(JSON.parse(saved));
+    } else {
+      setProjects(SAMPLE_PROJECTS);
+      localStorage.setItem('nexios_projects', JSON.stringify(SAMPLE_PROJECTS));
+    }
   }, []);
 
-  const saveProjects = (updated: Project[]) => {
-    setProjects(updated);
-    localStorage.setItem('nexios-projects', JSON.stringify(updated));
+  const saveProjects = (list: Project[]) => {
+    setProjects(list);
+    localStorage.setItem('nexios_projects', JSON.stringify(list));
   };
 
-  const handleCreate = () => {
-    if (!name.trim()) return;
-    const colors = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#ec4899','#06b6d4'];
-    const ext: Record<string, string> = { javascript: 'js', typescript: 'ts', python: 'py', rust: 'rs', go: 'go', html: 'html', css: 'css' };
-    const id = genId();
-    const project: Project = {
-      id, name: name.trim(), description: desc.trim(), language: lang,
-      color: colors[projects.length % colors.length],
-      files: [{ id: genId(), name: `main.${ext[lang] || lang}`, content: DEFAULT_CONTENT[lang] || '', language: lang }],
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  const createProject = () => {
+    if (!newName.trim()) return;
+    const proj: Project = {
+      id: `proj-${Date.now()}`,
+      name: newName.trim().toLowerCase().replace(/\s+/g, '-'),
+      description: newDesc || 'No description',
+      language: newLang,
+      createdAt: new Date().toISOString().split('T')[0],
+      lastModified: 'just now',
+      files: 1,
     };
-    saveProjects([project, ...projects]);
-    setName(''); setDesc(''); setLang('javascript'); setShowNew(false);
-    router.push(`/dashboard/sandbox/${project.id}`);
+    saveProjects([proj, ...projects]);
+    setNewName(''); setNewDesc(''); setShowCreate(false);
   };
 
-  const handleDelete = (id: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!confirm('Delete this project?')) return;
-    saveProjects(projects.filter(p => p.id !== id));
-  };
-
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const importGithub = async () => {
+    if (!githubUrl.trim()) return;
     setImporting(true);
     try {
-      const text = await file.text();
-      let importedProject: Partial<Project> | null = null;
-      if (file.name.endsWith('.json')) {
-        importedProject = JSON.parse(text);
-      } else {
-        const ext = file.name.split('.').pop() || 'js';
-        const langMap: Record<string, string> = { js: 'javascript', ts: 'typescript', py: 'python', rs: 'rust', go: 'go', html: 'html', css: 'css' };
-        const detectedLang = langMap[ext] || 'javascript';
-        const colors = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444'];
-        importedProject = {
-          name: file.name.replace(/\.[^/.]+$/, ''),
-          description: `Imported from ${file.name}`,
-          language: detectedLang,
-          color: colors[projects.length % colors.length],
-          files: [{ id: genId(), name: file.name, content: text, language: detectedLang }],
-        };
-      }
-      if (!importedProject || !importedProject.files) throw new Error('Invalid project file');
-      const project: Project = {
-        id: genId(),
-        name: importedProject.name || file.name.replace(/\.[^/.]+$/, ''),
-        description: importedProject.description || '',
-        language: importedProject.language || 'javascript',
-        color: importedProject.color || '#3b82f6',
-        files: importedProject.files.map(f => ({ ...f, id: genId() })),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+      const match = githubUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
+      if (!match) throw new Error('Invalid GitHub URL');
+      const [, owner, repo] = match;
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
+      const data = await res.json();
+      const proj: Project = {
+        id: `proj-${Date.now()}`,
+        name: data.name || repo,
+        description: data.description || 'Imported from GitHub',
+        language: data.language || 'Other',
+        createdAt: new Date().toISOString().split('T')[0],
+        lastModified: 'just now',
+        files: 0,
+        githubUrl: githubUrl.trim(),
       };
-      saveProjects([project, ...projects]);
-      router.push(`/dashboard/sandbox/${project.id}`);
+      saveProjects([proj, ...projects]);
+      setGithubUrl(''); setShowGithub(false);
     } catch {
-      alert('Failed to import. Make sure it\'s a valid project JSON or code file.');
+      alert('Failed to import. Make sure the repository is public.');
     } finally {
       setImporting(false);
-      if (importRef.current) importRef.current.value = '';
     }
   };
 
+  const deleteProject = (id: string) => {
+    saveProjects(projects.filter(p => p.id !== id));
+    setMenuOpen(null);
+  };
+
   const filtered = projects.filter(p =>
-    search === '' || p.name.toLowerCase().includes(search.toLowerCase()) || p.language.toLowerCase().includes(search.toLowerCase())
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.description.toLowerCase().includes(search.toLowerCase())
   );
 
-  if (!mounted) return null;
-
   return (
-    <div className="space-y-6 pb-8">
+    <div className="max-w-5xl space-y-6">
       {/* Header */}
-      <div className="flex items-start sm:items-center justify-between flex-wrap gap-3">
+      <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Projects</h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--text2)' }}>VS Code-like code sandboxes with AI assistance</p>
+          <h1 className="text-2xl font-bold text-white">Projects</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Your AI-powered coding workspaces</p>
         </div>
-        <div className="flex items-center gap-2">
-          <input ref={importRef} type="file" accept=".json,.js,.ts,.py,.rs,.go,.html,.css" className="hidden" onChange={handleImport} />
-          <button onClick={() => importRef.current?.click()} disabled={importing}
-            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all border"
-            style={{ background: 'var(--bg2)', borderColor: 'var(--border)', color: 'var(--text2)', opacity: importing ? 0.7 : 1 }}>
-            {importing ? (
-              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            )}
-            Import
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={() => setShowGithub(true)} className="btn-ghost text-sm gap-2">
+            <BsGithub className="w-4 h-4" /> Import from GitHub
           </button>
-          <button onClick={() => setShowNew(!showNew)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all shadow-md"
-            style={{ background: 'linear-gradient(135deg, #5b78ff, #8b5cf6)' }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            New Project
+          <button onClick={() => setShowCreate(true)} className="btn-primary text-sm gap-2">
+            <BsPlus className="w-4 h-4" /> New Project
           </button>
         </div>
       </div>
 
       {/* Search */}
-      {projects.length > 3 && (
-        <div className="relative">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text3)' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects…"
-            className="input-field pl-10" style={{ maxWidth: 360 }} />
-        </div>
-      )}
-
-      {/* New project form */}
-      {showNew && (
-        <div className="rounded-2xl border p-5 animate-slideDown card-surface">
-          <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text)' }}>New Project</h2>
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-semibold mb-1.5 block uppercase tracking-wide" style={{ color: 'var(--text2)' }}>Name *</label>
-              <input value={name} onChange={e => setName(e.target.value)} placeholder="My awesome project"
-                onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                className="input-field" autoFocus />
-            </div>
-            <div>
-              <label className="text-xs font-semibold mb-1.5 block uppercase tracking-wide" style={{ color: 'var(--text2)' }}>Description</label>
-              <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="What does this project do?"
-                className="input-field" />
-            </div>
-            <div>
-              <label className="text-xs font-semibold mb-2 block uppercase tracking-wide" style={{ color: 'var(--text2)' }}>Language</label>
-              <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-                {Object.entries(LANG_LABELS).map(([id, label]) => (
-                  <button key={id} onClick={() => setLang(id)}
-                    className="flex flex-col items-center gap-1.5 px-2 py-2.5 rounded-xl text-xs font-semibold border transition-all"
-                    style={{
-                      borderColor: lang === id ? LANG_COLORS[id] + '80' : 'var(--border)',
-                      background: lang === id ? LANG_COLORS[id] + '15' : 'var(--bg)',
-                      color: lang === id ? LANG_COLORS[id] : 'var(--text2)',
-                    }}>
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: LANG_COLORS[id] }} />
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button onClick={handleCreate} disabled={!name.trim()}
-                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all shadow-md"
-                style={{ background: name.trim() ? 'linear-gradient(135deg, #5b78ff, #8b5cf6)' : 'var(--text3)', cursor: name.trim() ? 'pointer' : 'not-allowed' }}>
-                Create & Open
-              </button>
-              <button onClick={() => setShowNew(false)}
-                className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all border"
-                style={{ borderColor: 'var(--border)', color: 'var(--text2)', background: 'var(--bg)' }}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="relative max-w-xs">
+        <HiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+        <input
+          value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search projects..."
+          className="input-base pl-9 text-sm"
+        />
+      </div>
 
       {/* Projects grid */}
-      {filtered.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map(project => (
-            <Link key={project.id} href={`/dashboard/sandbox/${project.id}`}
-              className="group rounded-2xl border p-5 hover:shadow-lg transition-all hover:scale-[1.01] relative overflow-hidden"
-              style={{ background: 'var(--bg2)', borderColor: 'var(--border)' }}
-              onMouseEnter={e => { (e.currentTarget.style.borderColor = project.color + '60'); }}
-              onMouseLeave={e => { (e.currentTarget.style.borderColor = 'var(--border)'); }}>
-              {/* Color bar */}
-              <div className="absolute top-0 left-0 right-0 h-0.5 transition-opacity opacity-0 group-hover:opacity-100" style={{ background: project.color }} />
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-sm font-bold shadow-lg"
-                  style={{ background: `linear-gradient(135deg, ${project.color}, ${project.color}99)` }}>
-                  {LANG_LABELS[project.language] || '?'}
-                </div>
-                <button onClick={e => handleDelete(project.id, e)}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all text-red-400"
-                  style={{ background: 'transparent' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
-                </button>
-              </div>
-              <h3 className="text-sm font-bold mb-1 truncate transition-colors" style={{ color: 'var(--text)' }}>{project.name}</h3>
-              {project.description && <p className="text-xs mb-3 line-clamp-2" style={{ color: 'var(--text2)' }}>{project.description}</p>}
-              <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text3)' }}>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full" style={{ background: LANG_COLORS[project.language] || '#888' }} />
-                  {project.language}
-                </span>
-                <span>{project.files.length} file{project.files.length !== 1 ? 's' : ''}</span>
-                <span className="ml-auto">{new Date(project.updatedAt).toLocaleDateString()}</span>
-              </div>
-            </Link>
-          ))}
+      {filtered.length === 0 ? (
+        <div className="glass rounded-2xl p-14 text-center">
+          <HiFolder className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
+          <h3 className="text-base font-semibold text-white mb-1">No projects found</h3>
+          <p className="text-sm mb-5" style={{ color: 'var(--text-secondary)' }}>Create your first project or import from GitHub</p>
+          <button onClick={() => setShowCreate(true)} className="btn-primary gap-2">
+            <BsPlus className="w-4 h-4" /> Create Project
+          </button>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-20 h-20 rounded-3xl mb-5 flex items-center justify-center" style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-9 h-9" style={{ color: 'var(--text3)' }}>
-              <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
-            </svg>
-          </div>
-          <h3 className="text-lg font-bold mb-1.5" style={{ color: 'var(--text)' }}>
-            {search ? 'No matching projects' : 'No projects yet'}
-          </h3>
-          <p className="text-sm mb-6" style={{ color: 'var(--text2)' }}>
-            {search ? `Try searching for something else` : 'Create a sandbox to code with AI assistance'}
-          </p>
-          {!search && (
-            <div className="flex items-center gap-3">
-              <button onClick={() => setShowNew(true)}
-                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all shadow-md"
-                style={{ background: 'linear-gradient(135deg, #5b78ff, #8b5cf6)' }}>
-                Create first project
-              </button>
-              <button onClick={() => importRef.current?.click()}
-                className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border"
-                style={{ borderColor: 'var(--border)', color: 'var(--text2)', background: 'var(--bg2)' }}>
-                Import file
-              </button>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map(p => {
+            const langColor = LANG_COLORS[p.language] || LANG_COLORS.Other;
+            return (
+              <div key={p.id} className="glass glass-hover rounded-2xl p-5 group relative transition-all duration-200" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}>
+                {/* Menu */}
+                <div className="absolute top-3 right-3">
+                  <button onClick={() => setMenuOpen(menuOpen === p.id ? null : p.id)}
+                    className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                    style={{ color: 'var(--text-muted)', background: 'var(--bg-card)' }}>
+                    <BsThreeDotsVertical className="w-3.5 h-3.5" />
+                  </button>
+                  {menuOpen === p.id && (
+                    <div className="absolute right-0 top-full mt-1 rounded-xl overflow-hidden z-20" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', minWidth: 140, boxShadow: '0 12px 32px rgba(0,0,0,0.5)' }}>
+                      <button onClick={() => deleteProject(p.id)}
+                        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm transition-colors text-left"
+                        style={{ color: 'var(--danger)' }}
+                        onMouseOver={e => (e.currentTarget.style.background = 'rgba(248,113,113,0.1)')}
+                        onMouseOut={e => (e.currentTarget.style.background = 'transparent')}>
+                        <BsTrash className="w-3.5 h-3.5" /> Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${langColor}18`, border: `1px solid ${langColor}33` }}>
+                    <BsCode className="w-4.5 h-4.5 w-[18px] h-[18px]" style={{ color: langColor }} />
+                  </div>
+                  <div className="flex-1 min-w-0 pr-6">
+                    <h3 className="text-sm font-bold text-white truncate">{p.name}</h3>
+                    <p className="text-xs mt-0.5 line-clamp-2" style={{ color: 'var(--text-muted)' }}>{p.description}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-2 h-2 rounded-full" style={{ background: langColor }} />
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{p.language}</span>
+                  {p.githubUrl && <BsGithub className="w-3 h-3 ml-1" style={{ color: 'var(--text-muted)' }} />}
+                  <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>{p.files} files</span>
+                </div>
+
+                <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid var(--glass-border)' }}>
+                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Modified {p.lastModified}</span>
+                  <Link href={`/dashboard/projects/${p.id}`}
+                    className="flex items-center gap-1 text-xs font-semibold transition-colors"
+                    style={{ color: 'var(--accent)' }}>
+                    Open <HiArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* New project card */}
+          <button onClick={() => setShowCreate(true)}
+            className="glass rounded-2xl p-5 flex flex-col items-center justify-center gap-3 min-h-[160px] transition-all duration-200 cursor-pointer group"
+            style={{ border: '1px dashed var(--glass-border)' }}
+            onMouseOver={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(129,140,248,0.4)'; (e.currentTarget as HTMLElement).style.background = 'rgba(129,140,248,0.04)'; }}
+            onMouseOut={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--glass-border)'; (e.currentTarget as HTMLElement).style.background = 'var(--bg-card)'; }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110"
+              style={{ background: 'var(--accent-glow)', border: '1px solid rgba(129,140,248,0.2)' }}>
+              <BsPlus className="w-5 h-5" style={{ color: 'var(--accent)' }} />
             </div>
-          )}
+            <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>New Project</span>
+          </button>
         </div>
       )}
+
+      {/* Create Modal */}
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)' }}>
+          <div className="glass rounded-2xl p-7 w-full max-w-md animate-scaleIn" style={{ boxShadow: '0 0 60px rgba(99,102,241,0.15)' }}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-bold text-white">Create New Project</h2>
+              <button onClick={() => setShowCreate(false)} style={{ color: 'var(--text-muted)' }}
+                onMouseOver={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+                onMouseOut={e => (e.currentTarget.style.color = 'var(--text-muted)')}>
+                <HiX className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Project Name</label>
+                <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="my-awesome-project"
+                  className="input-base" onKeyDown={e => e.key === 'Enter' && createProject()} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Description</label>
+                <input value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="What are you building?"
+                  className="input-base" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Language</label>
+                <select value={newLang} onChange={e => setNewLang(e.target.value)} className="input-base"
+                  style={{ appearance: 'none' }}>
+                  {Object.keys(LANG_COLORS).filter(l => l !== 'Other').map(l => (
+                    <option key={l} value={l} style={{ background: 'var(--bg-secondary)' }}>{l}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowCreate(false)} className="btn-ghost flex-1">Cancel</button>
+              <button onClick={createProject} className="btn-primary flex-1 gap-2">
+                <HiLightningBolt className="w-4 h-4" /> Create Project
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GitHub Import Modal */}
+      {showGithub && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)' }}>
+          <div className="glass rounded-2xl p-7 w-full max-w-md animate-scaleIn" style={{ boxShadow: '0 0 60px rgba(99,102,241,0.15)' }}>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <BsGithub className="w-5 h-5 text-white" />
+                <h2 className="text-lg font-bold text-white">Import from GitHub</h2>
+              </div>
+              <button onClick={() => setShowGithub(false)} style={{ color: 'var(--text-muted)' }}>
+                <HiX className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm mb-5" style={{ color: 'var(--text-secondary)' }}>
+              Enter a public GitHub repository URL to import its files into your workspace.
+            </p>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Repository URL</label>
+              <input value={githubUrl} onChange={e => setGithubUrl(e.target.value)}
+                placeholder="https://github.com/username/repo"
+                className="input-base" onKeyDown={e => e.key === 'Enter' && importGithub()} />
+            </div>
+            <div className="glass rounded-xl p-3 mt-4 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <strong style={{ color: 'var(--text-secondary)' }}>Note:</strong> Only public repositories are supported. The AI agent will analyse your codebase upon import.
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowGithub(false)} className="btn-ghost flex-1">Cancel</button>
+              <button onClick={importGithub} disabled={importing} className="btn-primary flex-1 gap-2"
+                style={{ opacity: importing ? 0.6 : 1 }}>
+                {importing ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Importing...</> : <><BsGithub className="w-4 h-4" /> Import</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Click outside menu handler */}
+      {menuOpen && <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />}
     </div>
   );
 }
