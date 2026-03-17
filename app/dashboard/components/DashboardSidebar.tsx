@@ -60,7 +60,7 @@ export default function DashboardSidebar({ isOpen, user, isMobileOpen, onMobileC
   return (
     <>
       {isMobileOpen && (
-        <div className="fixed inset-0 z-30 md:hidden" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+        <div className="fixed inset-0 z-30 md:hidden" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
           onClick={onMobileClose} />
       )}
 
@@ -68,7 +68,7 @@ export default function DashboardSidebar({ isOpen, user, isMobileOpen, onMobileC
           ${isOpen ? 'w-60' : 'w-[72px]'}
           ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
-        style={{ background: 'rgba(8,12,20,0.95)', backdropFilter: 'blur(24px)', borderRight: '1px solid var(--glass-border)' }}>
+        style={{ background: 'var(--bg-secondary)', backdropFilter: 'blur(24px)', borderRight: '1px solid var(--glass-border)' }}>
 
         {/* Logo */}
         <div className="h-14 flex items-center px-4 shrink-0" style={{ borderBottom: '1px solid var(--glass-border)' }}>
@@ -76,7 +76,7 @@ export default function DashboardSidebar({ isOpen, user, isMobileOpen, onMobileC
             <BsRobot className="w-4 h-4 text-white" />
           </div>
           {isOpen && (
-            <span className="ml-2.5 text-sm font-bold text-white truncate">
+            <span className="ml-2.5 text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
               Nexios<span style={{ color: 'var(--accent)' }}>AI</span>
             </span>
           )}
@@ -97,8 +97,8 @@ export default function DashboardSidebar({ isOpen, user, isMobileOpen, onMobileC
                 onClick={onMobileClose}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 group relative"
                 style={{
-                  background: active ? 'rgba(129,140,248,0.15)' : 'transparent',
-                  border: `1px solid ${active ? 'rgba(129,140,248,0.2)' : 'transparent'}`,
+                  background: active ? 'var(--accent-glow)' : 'transparent',
+                  border: `1px solid ${active ? 'rgba(99,102,241,0.2)' : 'transparent'}`,
                   color: active ? 'var(--accent)' : 'var(--text-secondary)',
                 }}
                 onMouseOver={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = 'var(--bg-card)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; } }}
@@ -110,13 +110,13 @@ export default function DashboardSidebar({ isOpen, user, isMobileOpen, onMobileC
                   <span className="text-sm font-medium truncate flex-1">{item.label}</span>
                 )}
                 {isOpen && item.badge && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid rgba(129,140,248,0.2)' }}>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'var(--accent-glow)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}>
                     {item.badge}
                   </span>
                 )}
                 {!isOpen && (
                   <div className="absolute left-full ml-3 px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50"
-                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)' }}>
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', color: 'var(--text-primary)', boxShadow: 'var(--shadow-md)' }}>
                     {item.label}
                   </div>
                 )}
@@ -135,7 +135,7 @@ export default function DashboardSidebar({ isOpen, user, isMobileOpen, onMobileC
               </div>
               {isOpen && (
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold truncate text-white">{user.fullName}</p>
+                  <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{user.fullName}</p>
                   <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{user.email}</p>
                 </div>
               )}
