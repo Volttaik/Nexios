@@ -1,20 +1,20 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import {
   BsGlobe,
   BsFileCode, BsFolder, BsFolder2Open, BsPlus, BsTrash3,
   BsChevronDown, BsChevronRight,
   BsFileEarmarkCode, BsFileEarmark, BsFileEarmarkText, BsSearch,
-  BsDownload,
-  BsFileEarmarkRichtext, BsBrush, BsStars
+  BsDownload, BsStars, BsPlayCircle, BsClipboard, BsFolderPlus, BsUpload
 } from 'react-icons/bs';
 import {
   HiArrowLeft,
-  HiFolder, HiMenu, HiOutlineFolder, HiCode, HiPaperAirplane
+  HiFolder, HiMenu, HiOutlineFolder, HiCode, HiPaperAirplane, HiX
 } from 'react-icons/hi';
+import { SiFigma } from 'react-icons/si';
 import Link from 'next/link';
 import { useAI } from '@/app/context/AIContext';
 import { callAI } from '@/app/lib/ai';
@@ -63,14 +63,12 @@ const EXT_LANG: Record<string, string> = {
   ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript',
   py: 'python', rs: 'rust', go: 'go', html: 'html', css: 'css',
   json: 'json', md: 'markdown', sh: 'shell', sql: 'sql', yaml: 'yaml', yml: 'yaml',
-  toml: 'ini', env: 'plaintext', gitignore: 'plaintext',
+  toml: 'ini', env: 'plaintext', gitignore: 'plaintext', txt: 'plaintext',
 };
 
 const FILE_ICONS: Record<string, any> = {
-  ts: BsFileEarmarkCode, tsx: BsFileEarmarkCode,
-  js: BsFileEarmarkCode, jsx: BsFileEarmarkCode,
-  py: BsFileEarmarkCode, json: BsFileEarmarkCode,
-  md: BsFileEarmarkText, txt: BsFileEarmarkText,
+  ts: BsFileEarmarkCode, tsx: BsFileEarmarkCode, js: BsFileEarmarkCode, jsx: BsFileEarmarkCode,
+  py: BsFileEarmarkCode, json: BsFileEarmarkCode, md: BsFileEarmarkText, txt: BsFileEarmarkText,
   default: BsFileEarmark
 };
 
@@ -121,8 +119,14 @@ function getAllFilePaths(nodes: FileNode[]): string[] {
   }
   return paths;
 }
-
-// Add a file to the tree, creating intermediate folders if needed
+function getAllFileNodes(nodes: FileNode[]): { path: string; content: string }[] {
+  let result: { path: string; content: string }[] = [];
+  for (const node of nodes) {
+    if (node.type === 'file') result.push({ path: node.path, content: node.content || '' });
+    if (node.children) result = result.concat(getAllFileNodes(node.children));
+  }
+  return result;
+}
 function addFileByPath(nodes: FileNode[], path: string, content: string): FileNode[] {
   const parts = path.split('/');
   if (parts.length === 1) {
@@ -144,7 +148,7 @@ function addFileByPath(nodes: FileNode[], path: string, content: string): FileNo
   return [...nodes, newFolder];
 }
 
-// ─────────────────────────── AI Operations Parser ───────────────────────────
+// ─────────────────────────── AI Ops Parser ───────────────────────────
 function parseAIResponse(raw: string): { text: string; ops: FileOp[] } {
   const opsMatch = raw.match(/<nexios_ops>([\s\S]*?)<\/nexios_ops>/i);
   const text = raw.replace(/<nexios_ops>[\s\S]*?<\/nexios_ops>/gi, '').trim();
@@ -153,7 +157,7 @@ function parseAIResponse(raw: string): { text: string; ops: FileOp[] } {
     try {
       const parsed = JSON.parse(opsMatch[1].trim());
       if (Array.isArray(parsed)) ops = parsed;
-    } catch { /* malformed JSON ops block — skip */ }
+    } catch { /* ignore malformed */ }
   }
   return { text, ops };
 }
@@ -166,11 +170,9 @@ function ThinkingAnimation() {
         <BsStars size={12} className="text-indigo-400" />
       </div>
       <div className="flex items-center gap-1">
-        <div className="thinking-bar" style={{ animationDelay: '0ms' }} />
-        <div className="thinking-bar" style={{ animationDelay: '120ms' }} />
-        <div className="thinking-bar" style={{ animationDelay: '240ms' }} />
-        <div className="thinking-bar" style={{ animationDelay: '360ms' }} />
-        <div className="thinking-bar" style={{ animationDelay: '480ms' }} />
+        {[0,1,2,3,4].map(i => (
+          <div key={i} className="thinking-bar" style={{ animationDelay: `${i * 120}ms` }} />
+        ))}
       </div>
       <span className="text-[10px] text-white/30 ml-1">Working…</span>
     </div>
@@ -179,14 +181,10 @@ function ThinkingAnimation() {
 
 // ─────────────────────────── File Tree ───────────────────────────
 function FileTree({ nodes, onSelect, selectedPath, onDelete, onRename, onAdd, expanded, setExpanded }: {
-  nodes: FileNode[];
-  onSelect: (path: string) => void;
-  selectedPath: string;
-  onDelete: (path: string) => void;
-  onRename: (path: string, newName: string) => void;
+  nodes: FileNode[]; onSelect: (path: string) => void; selectedPath: string;
+  onDelete: (path: string) => void; onRename: (path: string, newName: string) => void;
   onAdd: (parentPath: string, type: 'file' | 'folder') => void;
-  expanded: Record<string, boolean>;
-  setExpanded: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  expanded: Record<string, boolean>; setExpanded: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
@@ -196,19 +194,16 @@ function FileTree({ nodes, onSelect, selectedPath, onDelete, onRename, onAdd, ex
     const isExp = expanded[node.path];
     const isSel = selectedPath === node.path;
     const FileIcon = getFileIcon(node.name);
-
     if (renaming === node.path) {
       return (
         <div key={node.id} className="flex items-center px-2 py-0.5" style={{ paddingLeft: depth * 12 + 8 }}>
           <input value={newName} onChange={e => setNewName(e.target.value)}
             onBlur={() => { if (newName.trim()) onRename(node.path, newName.trim()); setRenaming(null); }}
             onKeyDown={e => e.key === 'Enter' && newName.trim() && (onRename(node.path, newName.trim()), setRenaming(null))}
-            className="w-full text-[11px] bg-black/40 border border-white/20 rounded px-1.5 py-0.5 outline-none focus:border-indigo-400 text-white"
-            autoFocus />
+            className="w-full text-[11px] bg-black/40 border border-white/20 rounded px-1.5 py-0.5 outline-none focus:border-indigo-400 text-white" autoFocus />
         </div>
       );
     }
-
     return (
       <div key={node.id}>
         <div className={`flex items-center gap-1 px-2 py-0.5 cursor-pointer group ${isSel ? 'bg-indigo-600/20' : 'hover:bg-white/5'}`}
@@ -227,32 +222,26 @@ function FileTree({ nodes, onSelect, selectedPath, onDelete, onRename, onAdd, ex
       </div>
     );
   };
-
   return <div className="space-y-0">{nodes.map(node => renderNode(node, 0))}</div>;
 }
 
-// ─────────────────────────── Markdown-like renderer ───────────────────────────
+// ─────────────────────────── Message Renderer ───────────────────────────
 function MessageContent({ content }: { content: string }) {
-  // Bold, code inline, newlines
   const lines = content.split('\n');
   return (
     <div className="space-y-1 text-[12px] leading-relaxed">
       {lines.map((line, i) => {
         if (line.startsWith('```')) return null;
-        // Render inline code
         const parts = line.split(/(`[^`]+`)/g);
         return (
           <p key={i} className="whitespace-pre-wrap break-words">
             {parts.map((part, j) => {
-              if (part.startsWith('`') && part.endsWith('`')) {
+              if (part.startsWith('`') && part.endsWith('`'))
                 return <code key={j} className="px-1 py-0.5 rounded text-[11px] font-mono" style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>{part.slice(1, -1)}</code>;
-              }
-              // Bold
               const bold = part.split(/(\*\*[^*]+\*\*)/g);
-              return bold.map((b, k) => {
-                if (b.startsWith('**') && b.endsWith('**')) return <strong key={k} className="text-white font-semibold">{b.slice(2, -2)}</strong>;
-                return <span key={k}>{b}</span>;
-              });
+              return bold.map((b, k) => b.startsWith('**') && b.endsWith('**')
+                ? <strong key={k} className="text-white font-semibold">{b.slice(2, -2)}</strong>
+                : <span key={k}>{b}</span>);
             })}
           </p>
         );
@@ -261,18 +250,13 @@ function MessageContent({ content }: { content: string }) {
   );
 }
 
-// ─────────────────────────── Op Pill ───────────────────────────
 function OpPill({ op }: { op: FileOp }) {
-  const colors: Record<string, string> = {
-    create: '#34d399', edit: '#60a5fa', delete: '#f87171', mkdir: '#fbbf24'
-  };
-  const labels: Record<string, string> = {
-    create: 'Created', edit: 'Edited', delete: 'Deleted', mkdir: 'Created folder'
-  };
+  const colors: Record<string, string> = { create: '#34d399', edit: '#60a5fa', delete: '#f87171', mkdir: '#fbbf24' };
+  const labels: Record<string, string> = { create: 'Created', edit: 'Edited', delete: 'Deleted', mkdir: 'Mkdir' };
   return (
-    <div className="flex items-center gap-1.5 mt-1.5">
-      <div className="w-1.5 h-1.5 rounded-full" style={{ background: colors[op.op] || '#fff' }} />
-      <span className="text-[10px]" style={{ color: colors[op.op] || '#fff' }}>{labels[op.op] || op.op}</span>
+    <div className="flex items-center gap-1.5 mt-1">
+      <div className="w-1.5 h-1.5 rounded-full" style={{ background: colors[op.op] }} />
+      <span className="text-[10px]" style={{ color: colors[op.op] }}>{labels[op.op] || op.op}</span>
       <span className="text-[10px] text-white/40 font-mono">{op.path}</span>
     </div>
   );
@@ -281,12 +265,13 @@ function OpPill({ op }: { op: FileOp }) {
 // ─────────────────────────── Main Component ───────────────────────────
 type PanelTab = 'chat' | 'terminal';
 type ContentTab = 'code' | 'files' | 'design' | 'document';
+type CreateTab = 'new' | 'import';
 
 export default function ProjectWorkspace() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
-
-  const { activeProvider, activeModel, getApiKey, setActiveModel, setActiveProvider } = useAI();
+  const { activeProvider, activeModel, getApiKey, setActiveModel } = useAI();
 
   const [project, setProject] = useState<Project | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
@@ -299,12 +284,17 @@ export default function ProjectWorkspace() {
   const [codeSearch, setCodeSearch] = useState('');
   const [creatingIn, setCreatingIn] = useState<{ path: string; type: 'file' | 'folder' } | null>(null);
   const [newFileName, setNewFileName] = useState('');
+  const [createTab, setCreateTab] = useState<CreateTab>('new');
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [docContent, setDocContent] = useState('');
   const [autonomousMode, setAutonomousMode] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [runOutput, setRunOutput] = useState<{ html: string; title: string } | null>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
+  const importFolderRef = useRef<HTMLInputElement>(null);
 
   const [messages, setMessages] = useState<ChatMsg[]>([
-    { role: 'assistant', content: 'Hello! I\'m Nexios AI. I can create files, write code, edit anything in your workspace, and help you build. What would you like to make?', timestamp: Date.now() }
+    { role: 'assistant', content: 'Hello! I\'m Nexios AI. I can create files, write code, run your project, and help you build anything. What would you like to make?', timestamp: Date.now() }
   ]);
   const [input, setInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
@@ -319,7 +309,6 @@ export default function ProjectWorkspace() {
   const [termInput, setTermInput] = useState('');
   const termEndRef = useRef<HTMLDivElement>(null);
 
-  // Load project
   useEffect(() => {
     const saved = localStorage.getItem('nexios_projects');
     if (saved) {
@@ -330,7 +319,6 @@ export default function ProjectWorkspace() {
         if (p.type === 'document') setContentTab('document');
         else if (p.type === 'design') setContentTab('design');
         else setContentTab('code');
-
         const savedFiles = localStorage.getItem(`nexios_files_${id}`);
         if (savedFiles) {
           const fileData = JSON.parse(savedFiles);
@@ -343,12 +331,19 @@ export default function ProjectWorkspace() {
       }
     }
     const savedChat = localStorage.getItem(`nexios_chat_${id}`);
-    if (savedChat) {
-      try { setMessages(JSON.parse(savedChat)); } catch { /* ignore */ }
-    }
+    if (savedChat) { try { setMessages(JSON.parse(savedChat)); } catch { /* ignore */ } }
     const savedAuto = localStorage.getItem('nexios_autonomous_mode');
     if (savedAuto) setAutonomousMode(savedAuto === 'true');
+
+    // ── Mark this workspace as active ──
+    localStorage.setItem('nexios_active_workspace', id);
   }, [id]);
+
+  // Clear active workspace when explicitly going back
+  const handleBack = () => {
+    localStorage.removeItem('nexios_active_workspace');
+    router.push('/dashboard/projects');
+  };
 
   useEffect(() => { if (files.length) localStorage.setItem(`nexios_files_${id}`, JSON.stringify(files)); }, [files, id]);
   useEffect(() => { localStorage.setItem(`nexios_chat_${id}`, JSON.stringify(messages)); }, [messages, id]);
@@ -362,11 +357,10 @@ export default function ProjectWorkspace() {
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, aiLoading]);
   useEffect(() => { termEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [termLines]);
 
-  // Apply file operations silently
+  // ── Apply file ops ──
   const applyOps = useCallback((ops: FileOp[], filesSnapshot: FileNode[]) => {
     let current = [...filesSnapshot];
     const appliedOps: FileOp[] = [];
-
     for (const op of ops) {
       try {
         if (op.op === 'create' || op.op === 'edit') {
@@ -378,26 +372,21 @@ export default function ProjectWorkspace() {
           appliedOps.push(op);
           setTermLines(p => [...p, { type: 'success', text: `✓ Deleted: ${op.path}` }]);
         } else if (op.op === 'mkdir') {
-          const folderNode = createFolderNode(op.path.split('/').pop() || op.path, op.path.includes('/') ? op.path.split('/').slice(0, -1).join('/') : '');
+          const parts = op.path.split('/');
+          const folderNode = createFolderNode(parts[parts.length - 1], parts.slice(0, -1).join('/') || '');
           current = [...current, folderNode];
           appliedOps.push(op);
-          setTermLines(p => [...p, { type: 'success', text: `✓ Created folder: ${op.path}` }]);
+          setTermLines(p => [...p, { type: 'success', text: `✓ Folder: ${op.path}` }]);
         }
-      } catch { /* ignore failed op */ }
+      } catch { /* ignore */ }
     }
-
     setFiles(current);
-
-    // Auto-select the first created/edited file
     const firstFileOp = appliedOps.find(o => o.op === 'create' || o.op === 'edit');
-    if (firstFileOp && (firstFileOp.op === 'create' || firstFileOp.op === 'edit')) {
-      setSelectedPath(firstFileOp.path);
-      setContentTab('code');
-    }
-
+    if (firstFileOp) { setSelectedPath(firstFileOp.path); setContentTab('code'); }
     return { current, appliedOps };
   }, []);
 
+  // ── File handlers ──
   const handleCodeChange = (value: string | undefined) => {
     if (!value || !selectedPath) return;
     setCode(value);
@@ -424,7 +413,6 @@ export default function ProjectWorkspace() {
     const newNode = creatingIn.type === 'file'
       ? createFileNode(newFileName.trim(), '', creatingIn.path)
       : createFolderNode(newFileName.trim(), creatingIn.path);
-
     if (creatingIn.path) {
       setFiles(prev => updateNodeByPath(prev, creatingIn.path, node => {
         if (node.type === 'folder') return { ...node, children: [...(node.children || []), newNode] };
@@ -433,64 +421,200 @@ export default function ProjectWorkspace() {
     } else {
       setFiles(prev => [...prev, newNode]);
     }
-
     setExpandedFolders(p => ({ ...p, [creatingIn.path]: true }));
-    if (creatingIn.type === 'file') setSelectedPath(newNode.path);
-    setCreatingIn(null);
-    setNewFileName('');
+    if (creatingIn.type === 'file') { setSelectedPath(newNode.path); setContentTab('code'); }
+    setCreatingIn(null); setNewFileName('');
   };
 
-  const exportProject = () => {
-    const blob = new Blob([JSON.stringify({ project, files, chat: messages, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `${project?.name || 'project'}-export.json`; a.click();
-    URL.revokeObjectURL(url);
+  // ── Import file from computer ──
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList) return;
+    Array.from(fileList).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const content = ev.target?.result as string || '';
+        const parentPath = creatingIn?.path || '';
+        const newNode = createFileNode(file.name, content, parentPath);
+        if (parentPath) {
+          setFiles(prev => updateNodeByPath(prev, parentPath, node => {
+            if (node.type === 'folder') return { ...node, children: [...(node.children || []), newNode] };
+            return node;
+          }));
+        } else {
+          setFiles(prev => [...prev, newNode]);
+        }
+        setSelectedPath(newNode.path);
+        setContentTab('code');
+        setTermLines(p => [...p, { type: 'success', text: `✓ Imported: ${file.name}` }]);
+      };
+      reader.readAsText(file);
+    });
+    setCreatingIn(null); setNewFileName('');
+    e.target.value = '';
   };
 
+  // ── Import folder ──
+  const handleImportFolder = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList) return;
+    let newFiles = [...files];
+    const promises = Array.from(fileList).map(file => {
+      return new Promise<void>(resolve => {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          const content = ev.target?.result as string || '';
+          const relativePath = (file as any).webkitRelativePath || file.name;
+          newFiles = addFileByPath(newFiles, relativePath, content);
+          setTermLines(p => [...p, { type: 'success', text: `✓ Imported: ${relativePath}` }]);
+          resolve();
+        };
+        reader.readAsText(file);
+      });
+    });
+    Promise.all(promises).then(() => {
+      setFiles(newFiles);
+      const paths = getAllFilePaths(newFiles);
+      if (paths.length) setSelectedPath(paths[0]);
+    });
+    e.target.value = '';
+  };
+
+  // ── Copy file path ──
+  const copyPath = () => {
+    if (selectedPath) {
+      navigator.clipboard.writeText(selectedPath);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
+  };
+
+  // ── Run file / project ──
+  const runFile = () => {
+    const ext = selectedPath.split('.').pop()?.toLowerCase();
+    if (ext === 'html') {
+      const node = findNodeByPath(files, selectedPath);
+      if (!node?.content) return;
+      // Find linked CSS and JS files and inline them
+      let html = node.content;
+      const allNodes = getAllFileNodes(files);
+      // Inline CSS
+      allNodes.filter(f => f.path.endsWith('.css')).forEach(css => {
+        html = html.replace(/<link[^>]*href=["']([^"']*\.css)["'][^>]*>/gi, (match, href) => {
+          if (css.path.endsWith(href) || href === css.path) {
+            return `<style>${css.content}</style>`;
+          }
+          return match;
+        });
+      });
+      // Inline JS
+      allNodes.filter(f => f.path.endsWith('.js')).forEach(js => {
+        html = html.replace(/<script[^>]*src=["']([^"']*)["'][^>]*><\/script>/gi, (match, src) => {
+          if (js.path.endsWith(src) || src === js.path) {
+            return `<script>${js.content}</script>`;
+          }
+          return match;
+        });
+      });
+      setRunOutput({ html, title: selectedPath });
+    } else {
+      // For non-HTML files, show a simple output window
+      const node = findNodeByPath(files, selectedPath);
+      const ext2 = selectedPath.split('.').pop()?.toLowerCase();
+      const simulated = `<html><head><title>Run: ${selectedPath}</title><style>body{background:#0d1117;color:#c9d1d9;font-family:monospace;padding:24px;margin:0;}pre{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px;overflow-x:auto;font-size:13px;line-height:1.6;}h2{color:#58a6ff;font-size:14px;margin:0 0 12px;}span.comment{color:#8b949e;}span.ok{color:#3fb950;}span.warn{color:#d29922;}</style></head><body>
+        <h2>▶ ${selectedPath}</h2>
+        <pre>${ext2 === 'py' ? `<span class="comment"># Python runtime not available in browser</span>\n<span class="comment"># Your code:</span>\n\n${node?.content?.replace(/</g, '&lt;').replace(/>/g, '&gt;') || ''}\n\n<span class="warn">→ To run Python, copy this code to your local terminal.</span>` : ext2 === 'js' || ext2 === 'ts' ? `<span class="comment">// Nexios Sandbox Output</span>\n<span class="ok">✓ File loaded: ${selectedPath}</span>\n<span class="comment">→ Executing in sandbox...</span>\n\n${ext2 === 'ts' ? '<span class="warn">TypeScript files require compilation first. Ask AI to help run this.</span>' : `<script-output>${node?.content?.slice(0, 200).replace(/</g, '&lt;') || ''}...</script-output>`}` : `<span class="ok">✓ File: ${selectedPath}</span>\n${node?.content?.replace(/</g, '&lt;').replace(/>/g, '&gt;') || ''}`}</pre>
+      </body></html>`;
+      setRunOutput({ html: simulated, title: `Run: ${selectedPath}` });
+    }
+  };
+
+  const runProject = () => {
+    const allNodes = getAllFileNodes(files);
+    const htmlFiles = allNodes.filter(f => f.path.endsWith('.html') || f.path.endsWith('.htm'));
+    const indexFile = htmlFiles.find(f => f.path.includes('index')) || htmlFiles[0];
+
+    if (!indexFile) {
+      // Build a file listing page
+      const listing = `<html><head><title>${project?.name} — Nexios</title><style>body{background:#0d1117;color:#c9d1d9;font-family:system-ui;padding:24px;}.file{padding:8px 12px;border-radius:6px;border:1px solid #30363d;margin:4px 0;cursor:pointer;background:#161b22;font-family:monospace;font-size:13px;}.file:hover{border-color:#58a6ff;color:#58a6ff;}h2{color:#fff;font-size:16px;}p{color:#8b949e;font-size:13px;}</style></head>
+      <body><h2>📁 ${project?.name}</h2><p>${allNodes.length} files — no index.html found. Create one to preview your project.</p>
+      ${allNodes.map(f => `<div class="file">${f.path}</div>`).join('')}</body></html>`;
+      setRunOutput({ html: listing, title: project?.name || 'Project' });
+      return;
+    }
+
+    // Bundle HTML with inline CSS and JS
+    let html = indexFile.content;
+    allNodes.filter(f => f.path.endsWith('.css')).forEach(css => {
+      const fileName = css.path.split('/').pop();
+      html = html.replace(new RegExp(`<link[^>]*href=["'][./]*${fileName}["'][^>]*>`, 'gi'), `<style>${css.content}</style>`);
+    });
+    allNodes.filter(f => f.path.endsWith('.js') && !f.path.endsWith('.min.js')).forEach(js => {
+      const fileName = js.path.split('/').pop();
+      html = html.replace(new RegExp(`<script[^>]*src=["'][./]*${fileName}["'][^>]*></script>`, 'gi'), `<script>${js.content}</script>`);
+    });
+    setRunOutput({ html, title: project?.name || 'Project' });
+  };
+
+  // ── ZIP Export ──
+  const exportZip = async () => {
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+      const allNodes = getAllFileNodes(files);
+      allNodes.forEach(({ path, content }) => { zip.file(path, content); });
+      if (docContent) zip.file('document.md', docContent);
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${project?.name || 'project'}.zip`; a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Export failed. Please try again.');
+    }
+  };
+
+  // ── Terminal ──
   const runTerminalCommand = async () => {
     if (!termInput.trim()) return;
     const cmd = termInput.trim();
     setTermLines(p => [...p, { type: 'input', text: `$ ${cmd}` }]);
     setTermInput('');
-
     const [command, ...args] = cmd.split(' ');
     if (command === 'ls') {
       const paths = getAllFilePaths(files);
-      paths.forEach(p => setTermLines(prev => [...prev, { type: 'output', text: p }]));
+      if (paths.length === 0) setTermLines(p => [...p, { type: 'output', text: '(empty workspace)' }]);
+      else paths.forEach(path => setTermLines(prev => [...prev, { type: 'output', text: path }]));
     } else if (command === 'cat' && args[0]) {
       const node = findNodeByPath(files, args[0]);
       if (node?.content) setTermLines(p => [...p, { type: 'output', text: node.content! }]);
       else setTermLines(p => [...p, { type: 'error', text: `cat: ${args[0]}: No such file` }]);
     } else if (command === 'touch' && args[0]) {
-      const newNode = createFileNode(args[0], '');
-      setFiles(prev => [...prev, newNode]);
+      setFiles(prev => [...prev, createFileNode(args[0], '')]);
       setTermLines(p => [...p, { type: 'success', text: `Created: ${args[0]}` }]);
     } else if (command === 'rm' && args[0]) {
       setFiles(prev => deleteNodeByPath(prev, args[0]));
       setTermLines(p => [...p, { type: 'success', text: `Deleted: ${args[0]}` }]);
     } else if (command === 'pwd') {
-      setTermLines(p => [...p, { type: 'output', text: '/workspace' }]);
+      setTermLines(p => [...p, { type: 'output', text: `/workspace/${project?.name || id}` }]);
     } else if (command === 'clear') {
       setTermLines([]);
+    } else if (command === 'run') {
+      runProject();
+      setTermLines(p => [...p, { type: 'success', text: 'Opening project preview...' }]);
     } else {
       setTermLines(p => [...p, { type: 'error', text: `Command not found: ${command}` }]);
     }
   };
 
-  // ─── Main AI Send ───
+  // ── AI Send ──
   const sendMessage = async () => {
     if (!input.trim() || aiLoading) return;
-
     const apiKey = getApiKey(activeProvider.id);
     if (!apiKey) {
-      setMessages(p => [...p, {
-        role: 'assistant',
-        content: `⚠️ Please add your ${activeProvider.name} API key in Settings first.`,
-        timestamp: Date.now()
-      }]);
+      setMessages(p => [...p, { role: 'assistant', content: `⚠️ Please add your ${activeProvider.name} API key in Settings first.`, timestamp: Date.now() }]);
       return;
     }
-
     const userMsg = input.trim();
     setInput('');
     setMessages(p => [...p, { role: 'user', content: userMsg, timestamp: Date.now() }]);
@@ -499,58 +623,40 @@ export default function ProjectWorkspace() {
     try {
       const currentFile = selectedPath ? findNodeByPath(files, selectedPath) : null;
       const allPaths = getAllFilePaths(files);
-
-      // Build the file context (content of open file, list of all files)
-      const fileContext = currentFile
-        ? `\nCurrently open file (${selectedPath}):\n\`\`\`\n${currentFile.content?.slice(0, 1200) || ''}\n\`\`\``
-        : '';
-
+      const fileContext = currentFile ? `\nCurrently open (${selectedPath}):\n\`\`\`\n${currentFile.content?.slice(0, 1200) || ''}\n\`\`\`` : '';
       const autonomousContext = autonomousMode
-        ? `\n\nAUTONOMOUS MODE ENABLED: You have full awareness of your own capabilities. You can propose improvements to how you work. To self-improve, you can create or edit files within the project that represent logic or configuration changes.`
-        : '';
+        ? `\n\nAUTONOMOUS MODE: You have full awareness of your own capabilities and can propose self-improvements.` : '';
 
-      const systemPrompt = `You are Nexios AI — an intelligent coding assistant with direct file system access. You work silently and efficiently. You can create, edit, and delete files instantly.
+      const systemPrompt = `You are Nexios AI — an intelligent coding assistant with direct file system access. You can create, edit, and delete files instantly.
 
 Project: "${project?.name || 'Untitled'}" (${project?.language || 'Unknown'})
-Files in workspace (${allPaths.length} total): ${allPaths.slice(0, 15).join(', ') || 'none'}${fileContext}${autonomousContext}
+Files: ${allPaths.slice(0, 15).join(', ') || 'none'}${fileContext}${autonomousContext}
 
-## HOW YOU WORK
-When you need to create or modify files, output a \`<nexios_ops>\` block containing a JSON array of operations. This block is NEVER shown to the user — it's executed automatically.
-
-## FILE OPERATION FORMAT
+## FILE OPERATIONS
+When creating/editing files, output a <nexios_ops> block (never shown to user, executed automatically):
 <nexios_ops>
 [
-  {"op": "create", "path": "index.html", "content": "<!DOCTYPE html>\\n<html>...</html>"},
+  {"op": "create", "path": "index.html", "content": "<!DOCTYPE html>..."},
   {"op": "edit", "path": "style.css", "content": "body { margin: 0; }"},
-  {"op": "delete", "path": "old-file.js"},
-  {"op": "mkdir", "path": "components"}
+  {"op": "delete", "path": "old.js"}
 ]
 </nexios_ops>
 
-## CRITICAL RULES
-1. When asked to create a file — ALWAYS use a nexios_ops block. NEVER paste the code into the chat.
-2. When asked to edit a file — use nexios_ops with op:"edit" and include the COMPLETE new file content.
-3. Your chat response should describe what you did/are doing. Be concise and direct.
-4. Do NOT show code blocks in the chat response when you're writing to a file. Just say "I've created..." or "Done — here's what I built:"
-5. For conversational questions, answer normally without any ops block.
-6. Always write complete, working, production-quality code in your ops.
-7. Use correct file paths (e.g. "src/components/Button.tsx" not just "Button.tsx").`;
+## RULES
+1. When asked to create/edit files — ALWAYS use nexios_ops, NEVER paste code in chat
+2. Your chat response should describe what you're doing — be concise
+3. Always write complete, working, production-quality code
+4. For HTML projects: include proper DOCTYPE, linked CSS/JS references
+5. For conversational questions, answer normally without ops`;
 
       const messagesForAI = [
         { role: 'user' as const, content: systemPrompt },
-        ...messages.slice(-10).map(m => ({
-          role: m.role === 'assistant' ? 'assistant' as const : 'user' as const,
-          content: m.content
-        })),
+        ...messages.slice(-10).map(m => ({ role: m.role === 'assistant' ? 'assistant' as const : 'user' as const, content: m.content })),
         { role: 'user' as const, content: userMsg }
       ];
 
       const rawResponse = await callAI(activeProvider.id, activeModel.id, messagesForAI, apiKey);
-
-      // Parse the response — split ops from conversational text
       const { text, ops } = parseAIResponse(rawResponse);
-
-      // Apply file operations in the background
       let appliedOps: FileOp[] = [];
       if (ops.length > 0) {
         setFileOpsInProgress(true);
@@ -558,20 +664,14 @@ When you need to create or modify files, output a \`<nexios_ops>\` block contain
         appliedOps = result.appliedOps;
         setFileOpsInProgress(false);
       }
-
       setMessages(p => [...p, {
         role: 'assistant',
         content: text || (ops.length > 0 ? 'Done.' : 'I\'m not sure how to help with that.'),
         timestamp: Date.now(),
         ops: appliedOps.length > 0 ? appliedOps : undefined
       }]);
-
     } catch (error) {
-      setMessages(p => [...p, {
-        role: 'assistant',
-        content: `Something went wrong: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        timestamp: Date.now()
-      }]);
+      setMessages(p => [...p, { role: 'assistant', content: `Something went wrong: ${error instanceof Error ? error.message : 'Unknown error'}`, timestamp: Date.now() }]);
     } finally {
       setAiLoading(false);
       setFileOpsInProgress(false);
@@ -584,64 +684,81 @@ When you need to create or modify files, output a \`<nexios_ops>\` block contain
   }, [] as { line: number; text: string }[]) : [];
 
   const projectType = project?.type || 'code';
+  const selectedExt = selectedPath.split('.').pop()?.toLowerCase() || '';
+  const canRun = selectedPath && ['html', 'htm', 'js', 'ts', 'py'].includes(selectedExt);
+  const lineCount = code.split('\n').length;
+  const wordCount = code.split(/\s+/).filter(Boolean).length;
 
   return (
     <div className="h-screen flex flex-col" style={{ background: '#080c14', color: '#fff' }}>
       <style>{`
-        .thinking-bar {
-          width: 3px;
-          height: 16px;
-          border-radius: 2px;
-          background: linear-gradient(180deg, #6366f1, #818cf8);
-          animation: thinkingPulse 0.9s ease-in-out infinite;
-          transform-origin: bottom;
-        }
-        @keyframes thinkingPulse {
-          0%, 100% { transform: scaleY(0.35); opacity: 0.4; }
-          50% { transform: scaleY(1); opacity: 1; }
-        }
-        .op-appear {
-          animation: opSlideIn 0.3s ease-out;
-        }
-        @keyframes opSlideIn {
-          from { opacity: 0; transform: translateY(-4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
+        .thinking-bar { width: 3px; height: 16px; border-radius: 2px; background: linear-gradient(180deg, #6366f1, #818cf8); animation: thinkingPulse 0.9s ease-in-out infinite; transform-origin: bottom; }
+        @keyframes thinkingPulse { 0%, 100% { transform: scaleY(0.35); opacity: 0.4; } 50% { transform: scaleY(1); opacity: 1; } }
+        .op-appear { animation: opSlideIn 0.3s ease-out; }
+        @keyframes opSlideIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
-      {/* ── Top Bar ── */}
-      <div className="h-10 flex items-center gap-3 px-3 shrink-0 border-b" style={{ borderColor: 'rgba(255,255,255,0.08)', background: '#0c0f17' }}>
-        <Link href="/dashboard/projects" className="text-white/40 hover:text-white/80 transition-colors">
-          <HiArrowLeft size={14} />
-        </Link>
-        <div className="w-px h-4 bg-white/10" />
+      {/* Hidden file inputs */}
+      <input ref={importFileRef} type="file" multiple className="hidden" onChange={handleImportFile} accept="*/*" />
+      <input ref={importFolderRef} type="file" multiple className="hidden" onChange={handleImportFolder}
+        {...({ webkitdirectory: '', directory: '' } as any)} />
 
+      {/* ── Run Output Modal ── */}
+      {runOutput && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#080c14' }}>
+          <div className="h-10 flex items-center gap-3 px-3 shrink-0 border-b" style={{ borderColor: 'rgba(255,255,255,0.08)', background: '#0c0f17' }}>
+            <button onClick={() => setRunOutput(null)} className="text-white/40 hover:text-white/80 transition-colors"><HiX size={16} /></button>
+            <div className="flex gap-1.5 ml-1"><div className="w-2.5 h-2.5 rounded-full bg-red-500/70"/><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/70"/><div className="w-2.5 h-2.5 rounded-full bg-green-500/70"/></div>
+            <span className="text-[11px] text-white/60 ml-1 font-mono">{runOutput.title}</span>
+            <button onClick={() => {
+              const win = window.open('', '_blank');
+              if (win) { win.document.write(runOutput.html); win.document.close(); }
+            }} className="ml-auto text-[10px] px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white transition-colors">
+              Open in new tab
+            </button>
+          </div>
+          <iframe srcDoc={runOutput.html} className="flex-1 w-full border-none" title="Preview" sandbox="allow-scripts allow-same-origin" />
+        </div>
+      )}
+
+      {/* ── Top Bar ── */}
+      <div className="h-10 flex items-center gap-2 px-3 shrink-0 border-b" style={{ borderColor: 'rgba(255,255,255,0.08)', background: '#0c0f17' }}>
+        <button onClick={handleBack} className="text-white/40 hover:text-white/80 transition-colors p-1" title="Close workspace">
+          <HiArrowLeft size={14} />
+        </button>
+        <div className="w-px h-4 bg-white/10" />
         <div className="flex items-center gap-2">
-          {projectType === 'code' && <HiCode size={13} className="text-indigo-400" />}
-          {projectType === 'design' && <BsBrush size={12} className="text-pink-400" />}
-          {projectType === 'document' && <BsFileEarmarkRichtext size={12} className="text-emerald-400" />}
           <span className="text-[12px] font-semibold text-white/90">{project?.name || 'Loading…'}</span>
           <span className="text-[9px] px-1.5 py-0.5 rounded capitalize" style={{ background: 'rgba(129,140,248,0.15)', color: '#818cf8' }}>{projectType}</span>
         </div>
-
         <div className="flex-1" />
 
-        {/* Single AI status indicator */}
+        {/* Run buttons */}
+        {canRun && (
+          <button onClick={runFile} title="Run current file"
+            className="flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-md font-medium transition-colors"
+            style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }}>
+            <BsPlayCircle size={11} /> Run File
+          </button>
+        )}
+        <button onClick={runProject} title="Run project"
+          className="flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-md font-medium transition-colors"
+          style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
+          <BsPlayCircle size={11} /> Run
+        </button>
+
+        {/* AI status */}
         <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
           <div className={`w-1.5 h-1.5 rounded-full transition-colors ${aiLoading ? 'bg-yellow-400 animate-pulse' : 'bg-indigo-400'}`} />
-          <span className="text-[10px] font-medium text-indigo-300">
-            {aiLoading ? 'Working…' : 'Nexios AI'}
-          </span>
+          <span className="text-[10px] font-medium text-indigo-300">{aiLoading ? 'Working…' : 'Nexios AI'}</span>
         </div>
 
         {autonomousMode && (
-          <div className="flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-bold" style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.25)', color: '#fbbf24' }}>
-            ⚡ AUTONOMOUS
-          </div>
+          <div className="text-[9px] px-2 py-1 rounded-lg font-bold hidden md:flex" style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.25)', color: '#fbbf24' }}>⚡ AUTO</div>
         )}
 
-        <button onClick={exportProject} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md text-white/50 hover:text-white/90 hover:bg-white/5 transition-colors">
-          <BsDownload size={11} /> Export
+        <button onClick={exportZip} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md text-white/50 hover:text-white/90 hover:bg-white/5 transition-colors" title="Export as ZIP">
+          <BsDownload size={11} /> ZIP
         </button>
 
         <div className="relative">
@@ -668,36 +785,59 @@ When you need to create or modify files, output a \`<nexios_ops>\` block contain
       {/* ── Main Layout ── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Left Sidebar ── */}
+        {/* ── Sidebar ── */}
         {sidebarOpen && (
-          <div className="flex flex-col shrink-0 border-r" style={{ width: 180, borderColor: 'rgba(255,255,255,0.08)' }}>
+          <div className="flex flex-col shrink-0 border-r" style={{ width: 184, borderColor: 'rgba(255,255,255,0.08)' }}>
             <div className="h-8 flex items-center justify-between px-2 border-b shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)', background: '#0c0f17' }}>
               <span className="text-[9px] font-bold tracking-widest text-white/30">EXPLORER</span>
               <div className="flex items-center gap-1">
-                <button onClick={() => setCreatingIn({ path: '', type: 'file' })} className="text-white/30 hover:text-white/80 transition-colors" title="New file"><BsPlus size={14} /></button>
+                <button onClick={() => { setCreatingIn({ path: '', type: 'file' }); setCreateTab('new'); }} className="text-white/30 hover:text-white/80 transition-colors" title="New file"><BsPlus size={14} /></button>
+                <button onClick={() => { setCreatingIn({ path: '', type: 'folder' }); setCreateTab('new'); }} className="text-white/30 hover:text-white/80 transition-colors" title="New folder"><BsFolderPlus size={12} /></button>
+                <button onClick={() => importFolderRef.current?.click()} className="text-white/30 hover:text-white/80 transition-colors" title="Import folder"><BsUpload size={11} /></button>
                 <button onClick={() => setSidebarOpen(false)} className="text-white/30 hover:text-white/80 transition-colors"><HiMenu size={13} /></button>
               </div>
             </div>
 
+            {/* Create / Import panel */}
             {creatingIn && (
-              <div className="p-1.5 border-b flex gap-1" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-                <input value={newFileName} onChange={e => setNewFileName(e.target.value)}
-                  placeholder={creatingIn.type === 'file' ? 'file.ts' : 'folder'}
-                  className="flex-1 px-2 py-0.5 text-[10px] bg-black/40 border border-white/20 rounded outline-none focus:border-indigo-400"
-                  onKeyDown={e => e.key === 'Enter' && handleCreateItem()} autoFocus />
-                <button onClick={handleCreateItem} className="px-1.5 py-0.5 bg-indigo-600 text-white text-[9px] rounded hover:bg-indigo-700">✓</button>
-                <button onClick={() => setCreatingIn(null)} className="px-1.5 py-0.5 bg-white/10 text-white/60 text-[9px] rounded hover:bg-white/20">✕</button>
+              <div className="border-b shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+                {/* Tabs */}
+                <div className="flex border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                  <button onClick={() => setCreateTab('new')} className={`flex-1 text-[9px] py-1.5 font-medium transition-colors ${createTab === 'new' ? 'text-indigo-300 border-b border-indigo-500' : 'text-white/30 hover:text-white/60'}`}>New</button>
+                  <button onClick={() => setCreateTab('import')} className={`flex-1 text-[9px] py-1.5 font-medium transition-colors ${createTab === 'import' ? 'text-indigo-300 border-b border-indigo-500' : 'text-white/30 hover:text-white/60'}`}>Import</button>
+                </div>
+                {createTab === 'new' ? (
+                  <div className="p-1.5 flex gap-1">
+                    <input value={newFileName} onChange={e => setNewFileName(e.target.value)}
+                      placeholder={creatingIn.type === 'file' ? 'file.ts' : 'folder-name'}
+                      className="flex-1 px-2 py-0.5 text-[10px] bg-black/40 border border-white/20 rounded outline-none focus:border-indigo-400"
+                      onKeyDown={e => e.key === 'Enter' && handleCreateItem()} autoFocus />
+                    <button onClick={handleCreateItem} className="px-1.5 py-0.5 bg-indigo-600 text-white text-[9px] rounded hover:bg-indigo-700">✓</button>
+                    <button onClick={() => setCreatingIn(null)} className="px-1.5 py-0.5 bg-white/10 text-white/60 text-[9px] rounded hover:bg-white/20">✕</button>
+                  </div>
+                ) : (
+                  <div className="p-1.5 space-y-1">
+                    <button onClick={() => importFileRef.current?.click()}
+                      className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] text-white/60 hover:text-white hover:bg-white/5 transition-colors border border-white/10">
+                      <BsUpload size={10} /> Import file(s) from computer
+                    </button>
+                    <button onClick={() => importFolderRef.current?.click()}
+                      className="w-full flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] text-white/60 hover:text-white hover:bg-white/5 transition-colors border border-white/10">
+                      <BsFolderPlus size={10} /> Import entire folder
+                    </button>
+                    <button onClick={() => setCreatingIn(null)} className="w-full text-[9px] text-white/30 hover:text-white/60 py-1">Cancel</button>
+                  </div>
+                )}
               </div>
             )}
 
             <div className="flex-1 overflow-auto py-1">
               <FileTree nodes={files} onSelect={p => { setSelectedPath(p); setContentTab('code'); }}
                 selectedPath={selectedPath} onDelete={handleDeleteFile} onRename={handleRename}
-                onAdd={(path, type) => setCreatingIn({ path, type })}
+                onAdd={(path, type) => { setCreatingIn({ path, type }); setCreateTab('new'); }}
                 expanded={expandedFolders} setExpanded={setExpandedFolders} />
             </div>
 
-            {/* AI working indicator in sidebar */}
             {(aiLoading || fileOpsInProgress) && (
               <div className="px-2 py-1.5 border-t shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
                 <div className="flex items-center gap-1.5">
@@ -709,7 +849,7 @@ When you need to create or modify files, output a \`<nexios_ops>\` block contain
           </div>
         )}
 
-        {/* ── Center Panel ── */}
+        {/* ── Center ── */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="h-8 flex items-center gap-0 border-b shrink-0 px-1" style={{ borderColor: 'rgba(255,255,255,0.08)', background: '#0c0f17' }}>
             {!sidebarOpen && (
@@ -718,8 +858,8 @@ When you need to create or modify files, output a \`<nexios_ops>\` block contain
             {[
               { id: 'code', label: 'Code', icon: BsFileCode },
               { id: 'files', label: 'Files', icon: HiOutlineFolder },
-              ...(projectType !== 'document' ? [{ id: 'design', label: 'Design', icon: BsBrush }] : []),
-              { id: 'document', label: 'Document', icon: BsFileEarmarkRichtext },
+              ...(projectType !== 'document' ? [{ id: 'design', label: 'Design', icon: BsGlobe }] : []),
+              { id: 'document', label: 'Doc', icon: BsFileEarmarkText },
             ].map((t: any) => (
               <button key={t.id} onClick={() => setContentTab(t.id as ContentTab)}
                 className={`h-8 flex items-center gap-1.5 px-3 text-[11px] border-b-2 transition-colors ${contentTab === t.id ? 'border-indigo-500 text-indigo-300' : 'border-transparent text-white/40 hover:text-white/70'}`}>
@@ -731,13 +871,20 @@ When you need to create or modify files, output a \`<nexios_ops>\` block contain
           {/* CODE VIEW */}
           {contentTab === 'code' && (
             <div className="flex-1 flex flex-col overflow-hidden relative">
-              <div className="h-7 flex items-center justify-between px-2 border-b shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-                <span className="text-[10px] text-white/40 font-mono">{selectedPath || 'No file selected'}</span>
-                <div className="flex items-center gap-2">
+              {/* Editor toolbar */}
+              <div className="h-7 flex items-center justify-between px-2 border-b shrink-0 gap-2" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <button onClick={copyPath} title="Copy path" className="text-white/30 hover:text-white/70 transition-colors shrink-0">
+                    <BsClipboard size={10} />
+                  </button>
+                  <span className="text-[10px] text-white/40 font-mono truncate">{copied ? '✓ Copied!' : (selectedPath || 'No file selected')}</span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {selectedPath && <span className="text-[9px] text-white/20">{lineCount}L · {wordCount}W</span>}
                   <div className="relative">
                     <BsSearch className="absolute left-2 top-1/2 -translate-y-1/2 text-white/30" size={9} />
                     <input value={codeSearch} onChange={e => setCodeSearch(e.target.value)}
-                      placeholder="Search…" className="w-28 pl-5 pr-2 py-0.5 text-[10px] bg-black/40 rounded border border-white/10 focus:border-indigo-400 outline-none" />
+                      placeholder="Search…" className="w-24 pl-5 pr-2 py-0.5 text-[10px] bg-black/40 rounded border border-white/10 focus:border-indigo-400 outline-none" />
                   </div>
                 </div>
               </div>
@@ -753,14 +900,21 @@ When you need to create or modify files, output a \`<nexios_ops>\` block contain
               <div className="flex-1">
                 {selectedPath ? (
                   <MonacoEditor value={code} language={getLang(selectedPath)} theme="vs-dark" onChange={handleCodeChange}
-                    options={{ fontSize: 12, minimap: { enabled: false }, lineNumbers: 'on', padding: { top: 8 }, scrollBeyondLastLine: false, wordWrap: 'on' }} />
+                    options={{ fontSize: 12, minimap: { enabled: false }, lineNumbers: 'on', padding: { top: 8 }, scrollBeyondLastLine: false, wordWrap: 'on', tabSize: 2 }} />
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full gap-3 text-white/30">
                     <BsFileCode size={32} />
                     <p className="text-sm">Select a file or ask AI to create one</p>
-                    <button onClick={() => setCreatingIn({ path: '', type: 'file' })} className="text-[11px] px-3 py-1.5 rounded border border-white/10 hover:border-indigo-400 hover:text-indigo-300 transition-colors">
-                      + Create new file
-                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={() => { setCreatingIn({ path: '', type: 'file' }); setCreateTab('new'); }}
+                        className="text-[11px] px-3 py-1.5 rounded border border-white/10 hover:border-indigo-400 hover:text-indigo-300 transition-colors">
+                        + New file
+                      </button>
+                      <button onClick={() => importFileRef.current?.click()}
+                        className="text-[11px] px-3 py-1.5 rounded border border-white/10 hover:border-indigo-400 hover:text-indigo-300 transition-colors">
+                        ↑ Import file
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -772,22 +926,32 @@ When you need to create or modify files, output a \`<nexios_ops>\` block contain
             <div className="flex-1 overflow-auto p-4">
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-[11px] font-semibold text-white/50">ALL FILES ({getAllFilePaths(files).length})</span>
-                <button onClick={() => setCreatingIn({ path: '', type: 'file' })} className="text-[10px] px-2 py-1 rounded border border-white/10 hover:border-indigo-400 text-white/50 hover:text-indigo-300 flex items-center gap-1 transition-colors">
-                  <BsPlus size={12} /> New File
-                </button>
+                <div className="flex gap-2">
+                  <button onClick={() => importFileRef.current?.click()} className="text-[10px] px-2 py-1 rounded border border-white/10 hover:border-indigo-400 text-white/50 hover:text-indigo-300 flex items-center gap-1 transition-colors">
+                    <BsUpload size={10} /> Import
+                  </button>
+                  <button onClick={() => { setCreatingIn({ path: '', type: 'file' }); setCreateTab('new'); }} className="text-[10px] px-2 py-1 rounded border border-white/10 hover:border-indigo-400 text-white/50 hover:text-indigo-300 flex items-center gap-1 transition-colors">
+                    <BsPlus size={12} /> New
+                  </button>
+                </div>
               </div>
               {getAllFilePaths(files).length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-white/20">
                   <HiFolder size={40} />
-                  <p className="text-sm mt-3">No files yet — ask AI to create some</p>
+                  <p className="text-sm mt-3">No files yet — ask AI or import from your computer</p>
                 </div>
               ) : (
                 <div className="space-y-1">
                   {getAllFilePaths(files).map(path => (
                     <div key={path} onClick={() => { setSelectedPath(path); setContentTab('code'); }}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${selectedPath === path ? 'bg-indigo-600/20' : 'hover:bg-white/5'}`}>
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors group ${selectedPath === path ? 'bg-indigo-600/20' : 'hover:bg-white/5'}`}>
                       <BsFileCode size={12} className="text-indigo-400 shrink-0" />
-                      <span className={`text-[12px] font-mono ${selectedPath === path ? 'text-indigo-300' : 'text-white/60'}`}>{path}</span>
+                      <span className={`text-[12px] font-mono flex-1 ${selectedPath === path ? 'text-indigo-300' : 'text-white/60'}`}>{path}</span>
+                      {canRun && path === selectedPath && (
+                        <button onClick={e => { e.stopPropagation(); runFile(); }} className="opacity-0 group-hover:opacity-100 text-green-400/70 hover:text-green-400 transition-colors">
+                          <BsPlayCircle size={12} />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -797,25 +961,54 @@ When you need to create or modify files, output a \`<nexios_ops>\` block contain
 
           {/* DESIGN VIEW */}
           {contentTab === 'design' && (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(244,114,182,0.1)', border: '1px solid rgba(244,114,182,0.2)' }}>
-                <BsBrush size={24} className="text-pink-400" />
-              </div>
-              <div>
+            <div className="flex-1 flex flex-col overflow-auto p-6 gap-5">
+              <div className="flex flex-col items-center text-center mb-2">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3" style={{ background: 'rgba(244,114,182,0.1)', border: '1px solid rgba(244,114,182,0.2)' }}>
+                  <SiFigma size={22} className="text-pink-400" />
+                </div>
                 <h3 className="text-base font-bold text-white mb-1">Design Canvas</h3>
-                <p className="text-sm text-white/40 max-w-xs">Import a Figma design or describe your UI — the AI will generate your components directly.</p>
+                <p className="text-sm text-white/40 max-w-xs">Import a Figma design or describe your UI — the AI generates components directly in your workspace.</p>
               </div>
-              <div className="flex gap-3 flex-wrap justify-center">
+
+              {/* Figma community templates */}
+              <div className="rounded-2xl border p-4" style={{ borderColor: 'rgba(244,114,182,0.2)', background: 'rgba(244,114,182,0.04)' }}>
+                <p className="text-xs font-semibold mb-3" style={{ color: '#f472b6' }}>Figma Community Templates</p>
+                <div className="space-y-2">
+                  {[
+                    { label: 'Material Design 3', url: 'https://www.figma.com/community/file/1035203688168086460', desc: 'Google\'s design system' },
+                    { label: 'Apple iOS 17 UI Kit', url: 'https://www.figma.com/community/file/1247950726448004999', desc: 'Official Apple components' },
+                    { label: 'Tailwind CSS UI Kit', url: 'https://www.figma.com/community/file/768809027799962739', desc: '200+ Tailwind components' },
+                    { label: 'Shadcn/UI Design Kit', url: 'https://www.figma.com/community/file/1203061493325953101', desc: 'Radix-based UI components' },
+                    { label: 'Ant Design System', url: 'https://www.figma.com/community/file/831698976089873405', desc: 'Enterprise UI framework' },
+                    { label: 'Bootstrap 5 UI Kit', url: 'https://www.figma.com/community/file/1042763499833335979', desc: 'Bootstrap components' },
+                  ].map(t => (
+                    <a key={t.url} href={t.url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all group"
+                      style={{ background: 'rgba(0,0,0,0.2)', borderColor: 'rgba(244,114,182,0.1)' }}
+                      onMouseOver={e => (e.currentTarget.style.borderColor = 'rgba(244,114,182,0.3)')}
+                      onMouseOut={e => (e.currentTarget.style.borderColor = 'rgba(244,114,182,0.1)')}>
+                      <SiFigma size={14} className="text-pink-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-white group-hover:text-pink-300 transition-colors">{t.label}</p>
+                        <p className="text-[10px] text-white/40">{t.desc}</p>
+                      </div>
+                      <span className="text-[10px] text-pink-400/60 group-hover:text-pink-400 transition-colors">Open →</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3 justify-center">
                 <button className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 text-sm text-white/60 hover:text-white hover:border-white/30 transition-colors" onClick={() => {
                   const url = prompt('Paste your Figma file URL:');
                   if (url) {
-                    const content = `# Figma Design Import\n\nSource: ${url}\n\nImported: ${new Date().toISOString()}\n\nAsk AI to convert this Figma design to code.`;
+                    const content = `# Figma Design Import\n\nSource: ${url}\nImported: ${new Date().toISOString()}\n\nAsk Nexios AI to convert this design to code:\n- "Convert this Figma design to React components"\n- "Generate the full HTML/CSS for this design"\n`;
                     setFiles(prev => [...prev, createFileNode('figma-import.md', content)]);
                     setSelectedPath('figma-import.md');
                     setContentTab('code');
                   }
                 }}>
-                  <BsGlobe size={13} /> Import from Figma
+                  <BsGlobe size={13} /> Import Figma URL
                 </button>
                 <button className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-white font-medium transition-colors" style={{ background: '#6366f1' }} onClick={() => setPanelTab('chat')}>
                   <BsStars size={13} /> Ask AI to design
@@ -827,20 +1020,19 @@ When you need to create or modify files, output a \`<nexios_ops>\` block contain
           {/* DOCUMENT VIEW */}
           {contentTab === 'document' && (
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="h-7 flex items-center px-3 border-b shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+              <div className="h-7 flex items-center justify-between px-3 border-b shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
                 <span className="text-[10px] text-white/40">Document Editor</span>
+                <span className="text-[9px] text-white/20">{docContent.split(/\s+/).filter(Boolean).length} words · {docContent.split('\n').length} lines</span>
               </div>
-              <textarea
-                value={docContent} onChange={e => setDocContent(e.target.value)}
-                placeholder={`Start writing your document here...\n\nUse markdown formatting:\n# Heading 1\n## Heading 2\n**Bold** and *italic* text\n- Bullet points\n\nAsk AI in the chat to help draft, edit, or expand content.`}
-                className="flex-1 p-5 bg-transparent text-[13px] text-white/80 resize-none outline-none leading-relaxed"
-              />
+              <textarea value={docContent} onChange={e => setDocContent(e.target.value)}
+                placeholder={`Start writing your document here...\n\nMarkdown supported:\n# Heading 1\n## Heading 2\n**Bold** and *italic*\n- Bullet points\n\nAsk AI in chat to draft, edit, or expand your content.`}
+                className="flex-1 p-5 bg-transparent text-[13px] text-white/80 resize-none outline-none leading-relaxed" />
             </div>
           )}
         </div>
 
         {/* ── Right Panel ── */}
-        <div className="flex flex-col shrink-0 border-l" style={{ width: 308, borderColor: 'rgba(255,255,255,0.08)' }}>
+        <div className="flex flex-col shrink-0 border-l" style={{ width: 310, borderColor: 'rgba(255,255,255,0.08)' }}>
           <div className="h-8 flex items-center border-b shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)', background: '#0c0f17' }}>
             {(['chat', 'terminal'] as PanelTab[]).map(tab => (
               <button key={tab} onClick={() => setPanelTab(tab)}
@@ -850,7 +1042,7 @@ When you need to create or modify files, output a \`<nexios_ops>\` block contain
             ))}
           </div>
 
-          {/* ── CHAT PANEL ── */}
+          {/* CHAT */}
           {panelTab === 'chat' && (
             <div className="flex-1 flex flex-col overflow-hidden">
               <div className="flex-1 overflow-auto p-3 space-y-3">
@@ -861,55 +1053,33 @@ When you need to create or modify files, output a \`<nexios_ops>\` block contain
                         <BsStars size={11} className="text-indigo-400" />
                       </div>
                     )}
-                    <div className={`flex-1 ${msg.role === 'user' ? 'items-end' : 'items-start'} flex flex-col gap-1`} style={{ maxWidth: '88%' }}>
-                      <div className={`px-3 py-2 rounded-2xl ${msg.role === 'assistant'
-                        ? 'rounded-tl-sm text-white/85'
-                        : 'rounded-tr-sm text-white ml-auto'}`}
+                    <div className="flex flex-col gap-1" style={{ maxWidth: '88%' }}>
+                      <div className={`px-3 py-2 rounded-2xl ${msg.role === 'assistant' ? 'rounded-tl-sm text-white/85' : 'rounded-tr-sm text-white ml-auto'}`}
                         style={{
                           background: msg.role === 'assistant' ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #6366f1, #818cf8)',
                           border: msg.role === 'assistant' ? '1px solid rgba(255,255,255,0.07)' : 'none'
                         }}>
                         <MessageContent content={msg.content} />
                       </div>
-                      {/* File operation pills */}
                       {msg.ops && msg.ops.length > 0 && (
-                        <div className="px-1 op-appear">
-                          {msg.ops.map((op, j) => <OpPill key={j} op={op} />)}
-                        </div>
+                        <div className="px-1 op-appear">{msg.ops.map((op, j) => <OpPill key={j} op={op} />)}</div>
                       )}
                     </div>
                   </div>
                 ))}
-
                 {aiLoading && <ThinkingAnimation />}
                 <div ref={chatEndRef} />
               </div>
 
-              {/* Input */}
               <div className="p-2 border-t shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
                 <div className="flex gap-2 items-end">
-                  <textarea
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-                    }}
+                  <textarea value={input} onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
                     placeholder="Ask anything — create files, write code, fix bugs…"
                     rows={1}
                     className="flex-1 px-3 py-2 text-[12px] rounded-xl outline-none resize-none border transition-colors"
-                    style={{
-                      background: 'rgba(255,255,255,0.04)',
-                      borderColor: input.trim() ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)',
-                      color: '#fff',
-                      maxHeight: 96,
-                      overflowY: 'auto'
-                    }}
-                    onInput={e => {
-                      const t = e.target as HTMLTextAreaElement;
-                      t.style.height = 'auto';
-                      t.style.height = Math.min(t.scrollHeight, 96) + 'px';
-                    }}
-                  />
+                    style={{ background: 'rgba(255,255,255,0.04)', borderColor: input.trim() ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)', color: '#fff', maxHeight: 96, overflowY: 'auto' }}
+                    onInput={e => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 96) + 'px'; }} />
                   <button onClick={sendMessage} disabled={aiLoading || !input.trim()}
                     className="w-8 h-8 rounded-xl flex items-center justify-center transition-all disabled:opacity-30 shrink-0"
                     style={{ background: input.trim() ? '#6366f1' : 'rgba(99,102,241,0.2)' }}>
@@ -917,14 +1087,14 @@ When you need to create or modify files, output a \`<nexios_ops>\` block contain
                   </button>
                 </div>
                 <div className="flex items-center justify-between mt-1.5 px-0.5">
-                  <span className="text-[9px] text-white/20">↵ to send · Shift+↵ for new line</span>
+                  <span className="text-[9px] text-white/20">↵ send · Shift+↵ new line</span>
                   <span className="text-[9px] text-white/20">{activeModel.name.split(' ')[0]}</span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ── TERMINAL PANEL ── */}
+          {/* TERMINAL */}
           {panelTab === 'terminal' && (
             <div className="flex-1 flex flex-col overflow-hidden">
               <div className="flex-1 overflow-auto p-2 font-mono text-[11px]">
@@ -935,11 +1105,14 @@ When you need to create or modify files, output a \`<nexios_ops>\` block contain
                 ))}
                 <div ref={termEndRef} />
               </div>
-              <div className="p-2 border-t flex gap-2 shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+              <div className="px-2 pt-1 border-t shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+                <div className="text-[9px] text-white/20 mb-1">ls · cat · touch · rm · pwd · run · clear</div>
+              </div>
+              <div className="p-2 flex gap-2 shrink-0">
                 <span className="text-green-400 font-mono text-[11px] mt-1.5">$</span>
                 <input value={termInput} onChange={e => setTermInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && runTerminalCommand()}
-                  placeholder="ls, cat, touch, rm, pwd…"
+                  placeholder="Enter command…"
                   className="flex-1 bg-transparent outline-none text-[11px] font-mono text-white/80" />
               </div>
             </div>
@@ -947,7 +1120,6 @@ When you need to create or modify files, output a \`<nexios_ops>\` block contain
         </div>
       </div>
 
-      {/* Click away for model selector */}
       {showModelSelector && <div className="fixed inset-0 z-40" onClick={() => setShowModelSelector(false)} />}
     </div>
   );
