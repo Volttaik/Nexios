@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { HiArrowRight, HiCode, HiLightningBolt } from 'react-icons/hi';
 import { BsRobot, BsCpu, BsStars, BsTerminal, BsGithub, BsBrush, BsFileEarmarkRichtext, BsPlayCircle, BsDownload, BsCodeSlash, BsCheck2Circle } from 'react-icons/bs';
-import { SiFigma } from 'react-icons/si';
 
 const NAV_LINKS = ['Features', 'Pricing', 'Docs', 'Blog'];
 
@@ -25,9 +24,9 @@ const WORKSPACE_MODES = [
     glow: 'rgba(129,140,248,0.15)',
     label: 'Code',
     tag: 'IDE',
-    headline: 'Full AI-powered IDE',
-    desc: 'Write, debug, and ship code with an AI that understands your entire codebase. Monaco editor, file tree, terminal, and an agent that directly creates and edits files — no copy-paste needed.',
-    bullets: ['AI writes files directly to your workspace', 'Monaco editor with 40+ language support', 'Built-in terminal with real commands', 'Import any GitHub repository instantly', 'Export your project as a ZIP'],
+    headline: 'Full AI-powered code IDE',
+    desc: 'A complete development environment with file explorer, Monaco editor, integrated terminal, and an AI agent that writes and edits files directly. Tell the AI what to build and watch it happen.',
+    bullets: ['AI writes complete files — no copy-paste', 'Monaco editor with 40+ language support', 'Integrated terminal for running commands', 'Real-time AI activity log as it codes', 'Export your full project instantly'],
     preview: [
       { name: 'src/', folder: true },
       { name: '  index.ts', active: true },
@@ -37,31 +36,14 @@ const WORKSPACE_MODES = [
     ],
   },
   {
-    icon: SiFigma,
-    color: '#f472b6',
-    glow: 'rgba(244,114,182,0.15)',
-    label: 'Figma Design',
-    tag: 'Design',
-    headline: 'Import Figma → working code',
-    desc: 'Paste any Figma file URL and let the AI convert your designs into pixel-perfect React, HTML, or Vue components. Access thousands of Figma community templates instantly.',
-    bullets: ['Import any public Figma file URL', 'AI converts designs to React/HTML/CSS', 'Access Figma community design systems', 'Material Design, iOS, and Tailwind kits', 'Component-level design inspection'],
-    preview: null,
-    figmaLinks: [
-      { label: 'Material Design 3', url: 'https://www.figma.com/community/file/1035203688168086460' },
-      { label: 'Apple iOS 17 UI', url: 'https://www.figma.com/community/file/1247950726448004999' },
-      { label: 'Tailwind UI Kit', url: 'https://www.figma.com/community/file/768809027799962739' },
-      { label: 'Shadcn/UI Kit', url: 'https://www.figma.com/community/file/1203061493325953101' },
-    ],
-  },
-  {
     icon: BsBrush,
     color: '#f472b6',
-    glow: 'rgba(244,114,182,0.12)',
+    glow: 'rgba(244,114,182,0.15)',
     label: 'Design',
-    tag: 'UI Gen',
-    headline: 'Describe UI, get components',
-    desc: 'Tell the AI what you want to build and watch it generate beautiful, production-ready UI components. From landing pages to dashboards — describe it, get code.',
-    bullets: ['AI generates complete UI from description', 'React, Vue, HTML/CSS output', 'Dark mode and responsive by default', 'Copy components directly to your project', 'Refine with natural language follow-ups'],
+    tag: 'Vector',
+    headline: 'Professional vector design canvas',
+    desc: 'A full-featured vector design environment with an infinite canvas, layer management, color palette, object alignment tools — and an AI design assistant to guide your visual decisions.',
+    bullets: ['Infinite vector canvas with all drawing tools', 'Layer management with visibility and locking', 'Full color palette with custom swatches', 'AI design assistant for layout and color advice', 'Export to PNG or SVG instantly'],
     preview: null,
   },
   {
@@ -69,10 +51,10 @@ const WORKSPACE_MODES = [
     color: '#34d399',
     glow: 'rgba(52,211,153,0.12)',
     label: 'Document',
-    tag: 'Docs',
-    headline: 'AI-powered documentation',
-    desc: 'Write technical docs, README files, API references, and proposals with an AI that knows your codebase. Markdown editor with AI drafting, editing, and expanding on demand.',
-    bullets: ['Markdown editor with live preview', 'AI drafts from your code context', 'Generate README, API docs, changelogs', 'Export to PDF or Markdown', 'Collaborative editing with version history'],
+    tag: 'Editor',
+    headline: 'Word-class document editor',
+    desc: 'A professional word processor with a full formatting ribbon, white-page canvas, font controls, and an AI writing assistant that can draft and insert content directly into your document.',
+    bullets: ['Full formatting ribbon — fonts, colors, alignment', 'White-page canvas with zoom and ruler', 'AI drafts content and inserts it in one click', 'Export to HTML, TXT, or print to PDF', 'Auto-save with live word and character count'],
     preview: null,
   },
 ];
@@ -294,49 +276,43 @@ export default function Home() {
 
                 {activeMode === 1 && (
                   <div className="space-y-3">
-                    <div className="rounded-xl p-4 border" style={{ borderColor: 'rgba(244,114,182,0.2)', background: 'rgba(244,114,182,0.05)' }}>
-                      <p className="text-xs font-semibold mb-3" style={{ color: '#f472b6' }}>Popular Figma Templates</p>
-                      {(mode as any).figmaLinks?.map((link: any, i: number) => (
-                        <a key={i} href={link.url} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-2 py-2 text-xs transition-colors group"
-                          style={{ color: 'var(--text-secondary)', borderBottom: i < 3 ? '1px solid rgba(244,114,182,0.1)' : 'none' }}>
-                          <SiFigma className="w-3 h-3 text-pink-400 shrink-0" />
-                          <span className="flex-1 group-hover:text-white transition-colors">{link.label}</span>
-                          <HiArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-pink-400" />
-                        </a>
-                      ))}
+                    <div className="rounded-xl overflow-hidden border" style={{ borderColor: 'rgba(244,114,182,0.2)', background: 'rgba(0,0,0,0.25)' }}>
+                      <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: 'rgba(244,114,182,0.1)', background: 'rgba(244,114,182,0.06)' }}>
+                        <BsBrush className="w-3 h-3" style={{ color: '#f472b6' }} />
+                        <span className="text-[10px] font-semibold" style={{ color: '#f472b6' }}>Design Canvas</span>
+                      </div>
+                      <div className="p-4 space-y-2">
+                        {['Layer 1 — Background', 'Layer 2 — Hero Section', 'Layer 3 — Navigation', 'Layer 4 — Components'].map((l, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs px-2 py-1 rounded" style={{ background: i === 1 ? 'rgba(244,114,182,0.1)' : 'transparent', color: i === 1 ? '#f472b6' : 'var(--text-muted)' }}>
+                            <span>{i === 1 ? '●' : '○'}</span> {l}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="rounded-xl px-3 py-2 text-xs" style={{ background: 'rgba(0,0,0,0.2)', color: 'var(--text-muted)', border: '1px solid var(--glass-border)' }}>
-                      Paste any Figma URL → AI converts to React code
+                    <div className="flex gap-1.5">
+                      {['#f472b6', '#818cf8', '#34d399', '#fbbf24', '#60a5fa'].map(c => (
+                        <div key={c} className="w-7 h-7 rounded-md border border-white/10" style={{ background: c }} />
+                      ))}
+                      <span className="text-xs self-center ml-1" style={{ color: 'var(--text-muted)' }}>AI-suggested palette</span>
                     </div>
                   </div>
                 )}
 
                 {activeMode === 2 && (
                   <div className="space-y-3">
-                    <div className="rounded-xl p-4" style={{ background: 'rgba(244,114,182,0.05)', border: '1px solid rgba(244,114,182,0.15)' }}>
-                      <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>User said:</p>
-                      <p className="text-sm text-white mb-3">&quot;Build me a dark pricing page with 3 tiers&quot;</p>
-                      <div className="h-px mb-3" style={{ background: 'rgba(244,114,182,0.1)' }} />
-                      <p className="text-xs mb-1" style={{ color: '#f472b6' }}>AI generated:</p>
-                      <div className="flex gap-1.5">
-                        {['PricingCard.tsx', 'pricing.css'].map(f => (
-                          <div key={f} className="px-2 py-1 rounded text-[10px] font-mono" style={{ background: 'rgba(244,114,182,0.1)', color: '#f472b6' }}>{f}</div>
-                        ))}
+                    <div className="rounded-xl overflow-hidden border bg-white" style={{ borderColor: 'rgba(52,211,153,0.2)' }}>
+                      <div className="flex items-center gap-1 px-3 py-1.5 border-b" style={{ borderColor: '#e5e7eb', background: '#f9fafb' }}>
+                        {['B', 'I', 'U'].map(f => <span key={f} className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{f}</span>)}
+                        <span className="text-[9px] text-gray-400 ml-2">Georgia 16px</span>
+                      </div>
+                      <div className="p-4">
+                        <div className="text-sm font-bold text-gray-900 mb-1">Introduction</div>
+                        <div className="text-xs text-gray-600 leading-relaxed">This document outlines the key principles of our API design, including authentication, rate limiting, and response formats…</div>
+                        <div className="mt-2 text-[10px] text-indigo-500 italic">← AI drafted this paragraph in 2 seconds</div>
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {activeMode === 3 && (
-                  <div className="space-y-2">
-                    <div className="rounded-xl p-4" style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.15)' }}>
-                      {['# API Reference', '## Authentication', 'All endpoints require...', '## Endpoints', '`GET /api/users`'].map((line, i) => (
-                        <div key={i} className="text-xs py-0.5 font-mono" style={{ color: i === 0 ? '#fff' : i === 1 || i === 3 ? '#34d399' : 'var(--text-muted)' }}>{line}</div>
-                      ))}
-                    </div>
                     <div className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.1)', color: 'var(--text-muted)' }}>
-                      AI drafted from your code in 3 seconds
+                      Ask AI to write, then insert with one click
                     </div>
                   </div>
                 )}
@@ -377,31 +353,139 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Linux Sandbox + GitHub ── */}
+      {/* ── Three Workspaces Showcase ── */}
       <section className="py-12 px-6">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-6">
-          <div className="glass rounded-2xl p-7 relative overflow-hidden group">
-            <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full opacity-10 transition-opacity group-hover:opacity-20"
-              style={{ background: 'var(--accent)', filter: 'blur(32px)' }} />
-            <BsTerminal className="w-8 h-8 mb-4" style={{ color: 'var(--accent)' }} />
-            <h3 className="text-xl font-bold text-white mb-2">Linux Workspace Terminal</h3>
-            <p className="text-sm leading-relaxed mb-4" style={{ color: 'var(--text-secondary)' }}>
-              Real terminal commands inside your workspace. Run ls, cat, touch, rm, and more. The AI uses the terminal automatically when working on your project.
-            </p>
-            <div className="glass rounded-xl p-3 font-code text-xs" style={{ color: '#a3e635' }}>
-              <span style={{ color: 'var(--accent)' }}>$</span> ls<br />
-              <span style={{ color: 'var(--text-muted)' }}>index.html  style.css  app.js</span><br />
-              <span style={{ color: 'var(--accent)' }}>$</span> <span className="animate-blink">▋</span>
-            </div>
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-10">
+            <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--accent)' }}>Three dedicated environments</p>
+            <h2 className="text-3xl font-bold text-white mb-3">One platform, three powerful workspaces</h2>
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Each workspace is purpose-built — no bloat, no crossover. Just the right tools for the job.</p>
           </div>
+          <div className="grid md:grid-cols-3 gap-5">
 
+            {/* Code IDE */}
+            <div className="glass rounded-2xl overflow-hidden group" style={{ border: '1px solid rgba(129,140,248,0.2)' }}>
+              <div className="h-2" style={{ background: 'linear-gradient(90deg, #6366f1, #818cf8)' }} />
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(129,140,248,0.15)' }}>
+                    <HiCode className="w-4 h-4" style={{ color: '#818cf8' }} />
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#818cf8' }}>Code IDE</p>
+                    <p className="text-sm font-bold text-white">AI-Powered Code Editor</p>
+                  </div>
+                </div>
+                <div className="rounded-lg overflow-hidden mb-3" style={{ background: '#080c14', border: '1px solid rgba(129,140,248,0.15)' }}>
+                  <div className="flex gap-1 px-3 py-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <span className="text-[9px] font-mono" style={{ color: '#818cf8' }}>index.ts</span>
+                  </div>
+                  <div className="p-3 font-mono text-[10px] space-y-0.5">
+                    <div><span style={{ color: '#818cf8' }}>const</span> <span style={{ color: '#60a5fa' }}>app</span> = <span style={{ color: '#f59e0b' }}>express</span>()</div>
+                    <div style={{ color: '#6b7280' }}>{'// AI wrote this for you'}</div>
+                    <div><span style={{ color: '#60a5fa' }}>app</span>.<span style={{ color: '#34d399' }}>listen</span>(<span style={{ color: '#fbbf24' }}>3000</span>)</div>
+                    <div className="flex items-center gap-1 mt-1"><span className="animate-blink" style={{ color: '#818cf8' }}>▋</span></div>
+                  </div>
+                </div>
+                <ul className="space-y-1">
+                  {['Monaco editor, file tree, terminal', 'AI agent writes files directly', 'Run & preview instantly'].map((b, i) => (
+                    <li key={i} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      <BsCheck2Circle className="w-3 h-3 shrink-0" style={{ color: '#818cf8' }} />{b}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Vector Design */}
+            <div className="glass rounded-2xl overflow-hidden group" style={{ border: '1px solid rgba(244,114,182,0.2)' }}>
+              <div className="h-2" style={{ background: 'linear-gradient(90deg, #ec4899, #f472b6)' }} />
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(244,114,182,0.15)' }}>
+                    <BsBrush className="w-4 h-4" style={{ color: '#f472b6' }} />
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#f472b6' }}>Design</p>
+                    <p className="text-sm font-bold text-white">Vector Design Canvas</p>
+                  </div>
+                </div>
+                <div className="rounded-lg overflow-hidden mb-3" style={{ background: '#080c14', border: '1px solid rgba(244,114,182,0.15)' }}>
+                  <div className="flex gap-3 px-3 py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    {['↖', '▭', '◯', 'T', '✏'].map((t, i) => <span key={i} className="text-[11px]" style={{ color: i === 0 ? '#f472b6' : 'rgba(255,255,255,0.3)' }}>{t}</span>)}
+                  </div>
+                  <div className="p-3">
+                    <div className="flex gap-1 mb-2">
+                      {['Layer 1', 'Layer 2', 'Layer 3'].map((l, i) => (
+                        <div key={i} className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: i === 0 ? 'rgba(244,114,182,0.15)' : 'rgba(255,255,255,0.04)', color: i === 0 ? '#f472b6' : 'rgba(255,255,255,0.3)' }}>{l}</div>
+                      ))}
+                    </div>
+                    <div className="flex gap-1">
+                      {['#f472b6', '#818cf8', '#34d399', '#fbbf24', '#60a5fa', '#fff'].map(c => (
+                        <div key={c} className="w-4 h-4 rounded-sm" style={{ background: c, border: '1px solid rgba(255,255,255,0.1)' }} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <ul className="space-y-1">
+                  {['Infinite vector canvas + full toolset', 'Layers, palette, object properties', 'AI design assistant built in'].map((b, i) => (
+                    <li key={i} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      <BsCheck2Circle className="w-3 h-3 shrink-0" style={{ color: '#f472b6' }} />{b}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Document Editor */}
+            <div className="glass rounded-2xl overflow-hidden group" style={{ border: '1px solid rgba(52,211,153,0.2)' }}>
+              <div className="h-2" style={{ background: 'linear-gradient(90deg, #10b981, #34d399)' }} />
+              <div className="p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(52,211,153,0.15)' }}>
+                    <BsFileEarmarkRichtext className="w-4 h-4" style={{ color: '#34d399' }} />
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#34d399' }}>Document</p>
+                    <p className="text-sm font-bold text-white">AI Word Processor</p>
+                  </div>
+                </div>
+                <div className="rounded-lg overflow-hidden mb-3" style={{ border: '1px solid rgba(52,211,153,0.2)' }}>
+                  <div className="flex gap-1 px-2 py-1.5 bg-white border-b border-gray-200">
+                    {['B', 'I', 'U', 'Align', 'Color'].map((t, i) => (
+                      <span key={i} className="text-[9px] px-1 py-0.5 rounded" style={{ background: i < 3 ? '#f1f5f9' : 'transparent', color: '#374151', fontWeight: i < 3 ? 700 : 400 }}>{t}</span>
+                    ))}
+                  </div>
+                  <div className="p-3 bg-white">
+                    <div className="text-[11px] font-bold text-gray-900 mb-1">Project Proposal</div>
+                    <div className="text-[10px] text-gray-600 leading-relaxed">This proposal outlines the scope, timeline, and budget for the new platform redesign initiative…</div>
+                    <div className="mt-1.5 text-[9px] px-2 py-0.5 rounded inline-block" style={{ background: 'rgba(52,211,153,0.1)', color: '#059669' }}>✓ AI inserted this</div>
+                  </div>
+                </div>
+                <ul className="space-y-1">
+                  {['Full ribbon toolbar with all formatting', 'White-page canvas with ruler', 'AI writes and inserts content'].map((b, i) => (
+                    <li key={i} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      <BsCheck2Circle className="w-3 h-3 shrink-0" style={{ color: '#34d399' }} />{b}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ── Integrations ── */}
+      <section className="py-12 px-6">
+        <div className="max-w-6xl mx-auto">
           <div className="glass rounded-2xl p-7 relative overflow-hidden group">
             <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full opacity-10 transition-opacity group-hover:opacity-20"
               style={{ background: '#34d399', filter: 'blur(32px)' }} />
             <BsGithub className="w-8 h-8 mb-4 text-white" />
-            <h3 className="text-xl font-bold text-white mb-2">GitHub Integration</h3>
+            <h3 className="text-xl font-bold text-white mb-2">Connect everything you use</h3>
             <p className="text-sm leading-relaxed mb-4" style={{ color: 'var(--text-secondary)' }}>
-              Import any public repository instantly. The AI reads your codebase, understands the context, and starts contributing right away.
+              Import any GitHub repository in one click. The AI reads your codebase, understands the structure, and contributes immediately. Deploy to Vercel, connect to Supabase — all from within Nexios.
             </p>
             <div className="flex gap-2 flex-wrap">
               {INTEGRATIONS.map(i => (
