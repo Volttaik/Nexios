@@ -21,9 +21,12 @@ import {
   BsPrinter, BsDownload, BsFileEarmark, BsFileEarmarkText,
   BsPaintBucket, BsHighlighter, BsTextIndentLeft, BsTextIndentRight,
   BsCardText, BsScissors, BsClipboard, BsFiles, BsFonts,
+  BsRobot, BsArrowRepeat, BsPlusCircle,
 } from 'react-icons/bs';
 import { HiArrowLeft, HiOutlineDocumentText } from 'react-icons/hi';
 import Link2 from 'next/link';
+import { useAI } from '@/app/context/AIContext';
+import { callAI } from '@/app/lib/ai';
 
 const FontSize = Extension.create({
   name: 'fontSize',
@@ -79,8 +82,14 @@ const LINE_SPACINGS = [
   { label: '1.5', value: '1.5' },
   { label: 'Double', value: '2' },
   { label: '2.5', value: '2.5' },
-  { label: 'Triple', value: '3' },
 ];
+
+interface ChatMsg {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+  insertable?: string;
+}
 
 function ToolBtn({
   onClick, active = false, disabled = false, title, children,
@@ -95,9 +104,9 @@ function ToolBtn({
       title={title}
       className="flex items-center justify-center w-7 h-7 rounded transition-all select-none text-sm"
       style={{
-        background: active ? '#dbeafe' : 'transparent',
-        color: active ? '#1d4ed8' : disabled ? '#d1d5db' : '#374151',
-        border: active ? '1px solid #bfdbfe' : '1px solid transparent',
+        background: active ? 'rgba(99,102,241,0.25)' : 'transparent',
+        color: active ? '#818cf8' : disabled ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.55)',
+        border: active ? '1px solid rgba(99,102,241,0.35)' : '1px solid transparent',
       }}
     >
       {children}
@@ -106,10 +115,10 @@ function ToolBtn({
 }
 
 function ToolbarDivider() {
-  return <div className="w-px h-5 mx-0.5 bg-gray-200" />;
+  return <div className="w-px h-5 mx-0.5" style={{ background: 'rgba(255,255,255,0.08)' }} />;
 }
 
-function DropdownBtn({ label, children, width = 180 }: { label: React.ReactNode; children: React.ReactNode; width?: number }) {
+function DarkDropdown({ label, children, width = 180 }: { label: React.ReactNode; children: React.ReactNode; width?: number }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -121,18 +130,44 @@ function DropdownBtn({ label, children, width = 180 }: { label: React.ReactNode;
     <div ref={ref} className="relative">
       <button
         onMouseDown={e => { e.preventDefault(); setOpen(o => !o); }}
-        className="flex items-center gap-1 h-7 px-2 rounded text-xs text-gray-600 hover:bg-gray-100 border border-transparent hover:border-gray-200 transition-all"
+        className="flex items-center gap-1 h-7 px-2 rounded text-xs transition-all"
+        style={{ color: 'rgba(255,255,255,0.55)', background: open ? 'rgba(255,255,255,0.08)' : 'transparent', border: '1px solid transparent' }}
+        onMouseOver={e => { if (!open) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
+        onMouseOut={e => { if (!open) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
       >
         {label}
-        <span className="text-gray-400 text-[10px]">▾</span>
+        <span className="text-[9px] ml-0.5" style={{ color: 'rgba(255,255,255,0.25)' }}>▾</span>
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-0.5 z-50 rounded-lg shadow-xl border border-gray-200 bg-white overflow-hidden" style={{ width, maxHeight: 220, overflowY: 'auto' }} onMouseDown={e => e.preventDefault()}>
+        <div
+          className="absolute top-full left-0 mt-0.5 z-50 rounded-lg shadow-2xl overflow-hidden"
+          style={{ width, maxHeight: 240, overflowY: 'auto', background: '#1a1e2e', border: '1px solid rgba(255,255,255,0.1)' }}
+          onMouseDown={e => e.preventDefault()}
+        >
           {children}
         </div>
       )}
     </div>
   );
+}
+
+function DropdownItem({ onSelect, active, children }: { onSelect: () => void; active?: boolean; children: React.ReactNode }) {
+  return (
+    <button
+      onMouseDown={e => { e.preventDefault(); onSelect(); }}
+      className="flex items-center gap-2 w-full px-3 py-1.5 text-xs transition-colors text-left"
+      style={{ color: active ? '#818cf8' : 'rgba(255,255,255,0.6)', background: active ? 'rgba(99,102,241,0.12)' : 'transparent' }}
+      onMouseOver={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
+      onMouseOut={e => { (e.currentTarget as HTMLElement).style.background = active ? 'rgba(99,102,241,0.12)' : 'transparent'; }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function parseInsertable(text: string): string | undefined {
+  const m = text.match(/---INSERT---([\s\S]*?)---ENDINSERT---/);
+  return m ? m[1].trim() : undefined;
 }
 
 export default function DocumentEditor({ content, onChange, projectName, projectId }: DocumentEditorProps) {
@@ -144,6 +179,15 @@ export default function DocumentEditor({ content, onChange, projectName, project
   const [charCount, setCharCount] = useState(0);
   const [zoom, setZoom] = useState(100);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { activeProvider, activeModel, getApiKey } = useAI();
+  const [messages, setMessages] = useState<ChatMsg[]>([
+    { role: 'assistant', content: 'Hi! I\'m your document AI. Ask me to draft content, improve your writing, suggest structure, or type "write intro about X" and I\'ll create content you can insert directly.', timestamp: Date.now() },
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [showChat, setShowChat] = useState(true);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -182,6 +226,8 @@ export default function DocumentEditor({ content, onChange, projectName, project
       editor.commands.setContent(content || '', { emitUpdate: false });
     }
   }, [content, editor]);
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   const applyFontSize = useCallback((size: number) => {
     setFontSize(size);
@@ -240,9 +286,64 @@ export default function DocumentEditor({ content, onChange, projectName, project
     setTimeout(() => setSaveStatus('saved'), 500);
   }, [editor, projectId]);
 
+  const insertAIContent = useCallback((html: string) => {
+    if (!editor) return;
+    editor.chain().focus().insertContent(html).run();
+  }, [editor]);
+
+  const sendMessage = async () => {
+    if (!chatInput.trim() || aiLoading) return;
+    const apiKey = getApiKey(activeProvider.id);
+    if (!apiKey) {
+      setMessages(p => [...p, { role: 'assistant', content: `Please add your ${activeProvider.name} API key in Settings to use AI assistance.`, timestamp: Date.now() }]);
+      return;
+    }
+    const userMsg = chatInput.trim();
+    setChatInput('');
+    setMessages(p => [...p, { role: 'user', content: userMsg, timestamp: Date.now() }]);
+    setAiLoading(true);
+
+    try {
+      const currentContent = editor?.getText().slice(0, 1500) || '';
+      const systemPrompt = `You are a professional writing assistant inside Nexios AI's document editor.
+
+The user is working on "${projectName || 'a document'}".
+Current document content (first 1500 chars):
+${currentContent ? `\`\`\`\n${currentContent}\n\`\`\`` : '(empty document)'}
+
+When the user asks you to WRITE or DRAFT content that should be inserted into their document:
+1. Provide your written content wrapped exactly like this:
+---INSERT---
+<p>Your HTML content here. Use proper HTML: <strong>bold</strong>, <em>italic</em>, <h2>headings</h2>, <ul><li>lists</li></ul></p>
+---ENDINSERT---
+
+2. After the INSERT block, briefly explain what you wrote.
+
+For questions, advice, or analysis — just respond normally without INSERT blocks.
+
+Always write in a professional, clear style appropriate for the document context.`;
+
+      const msgsForAI = [
+        { role: 'user' as const, content: systemPrompt },
+        ...messages.slice(-8).map(m => ({ role: m.role === 'assistant' ? 'assistant' as const : 'user' as const, content: m.content.replace(/---INSERT---[\s\S]*?---ENDINSERT---/g, '[inserted content]') })),
+        { role: 'user' as const, content: userMsg },
+      ];
+
+      const response = await callAI(activeProvider.id, activeModel.id, msgsForAI, apiKey);
+      const insertable = parseInsertable(response);
+      const display = response.replace(/---INSERT---[\s\S]*?---ENDINSERT---/, insertable ? `✓ Content ready to insert (${insertable.split(' ').length} words)` : '');
+
+      setMessages(p => [...p, { role: 'assistant', content: display, timestamp: Date.now(), insertable }]);
+    } catch (err: any) {
+      setMessages(p => [...p, { role: 'assistant', content: `Error: ${err.message}`, timestamp: Date.now() }]);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   if (!editor) return (
-    <div className="flex items-center justify-center h-screen bg-gray-100">
-      <div className="text-gray-400">Loading editor…</div>
+    <div className="flex items-center justify-center h-screen" style={{ background: '#080c14' }}>
+      <div className="text-white/30 text-sm">Loading editor…</div>
     </div>
   );
 
@@ -252,7 +353,7 @@ export default function DocumentEditor({ content, onChange, projectName, project
     : editor.isActive('heading', { level: 4 }) ? '4' : '0';
 
   return (
-    <div className="flex flex-col h-screen" style={{ background: '#e5e7eb', fontFamily: 'system-ui, sans-serif' }}>
+    <div className="flex flex-col h-screen" style={{ background: '#080c14', fontFamily: 'system-ui, sans-serif' }}>
       <style>{`
         @media print { .no-print { display: none !important; } }
         .nexdoc-editor { outline: none; font-size: ${fontSize}px; line-height: ${lineSpacing}; min-height: 700px; color: #111827; }
@@ -275,86 +376,89 @@ export default function DocumentEditor({ content, onChange, projectName, project
         .tiptap p.is-editor-empty:first-child::before { color: #9ca3af; content: attr(data-placeholder); float: left; height: 0; pointer-events: none; }
       `}</style>
 
-      {/* Title bar */}
-      <div className="no-print flex items-center gap-3 px-4 h-10 bg-blue-700 text-white shrink-0">
-        <Link2 href="/dashboard/projects" className="text-white/70 hover:text-white transition-colors">
-          <HiArrowLeft size={16} />
+      {/* ── Title bar ── */}
+      <div className="no-print flex items-center gap-3 px-3 h-10 shrink-0 border-b" style={{ background: '#0c0f17', borderColor: 'rgba(255,255,255,0.08)' }}>
+        <Link2 href="/dashboard/projects" className="text-white/40 hover:text-white/80 transition-colors">
+          <HiArrowLeft size={14} />
         </Link2>
-        <HiOutlineDocumentText size={15} className="text-blue-200" />
-        <span className="text-sm font-semibold">{projectName || 'Untitled Document'}</span>
-        <span className="text-blue-300 text-xs">— Word Processor</span>
+        <div className="w-px h-4 bg-white/10" />
+        <HiOutlineDocumentText size={13} className="text-indigo-400" />
+        <span className="text-[12px] font-semibold text-white/90">{projectName || 'Untitled Document'}</span>
+        <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(129,140,248,0.15)', color: '#818cf8' }}>
+          Document
+        </span>
         <div className="flex-1" />
-        <span className={`text-xs px-2 py-0.5 rounded-full ${saveStatus === 'saved' ? 'bg-blue-600 text-blue-100' : saveStatus === 'saving' ? 'bg-yellow-500 text-yellow-900' : 'bg-orange-500 text-white'}`}>
+        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${saveStatus === 'saved' ? '' : saveStatus === 'saving' ? '' : ''}`}
+          style={{ background: saveStatus === 'saved' ? 'rgba(52,211,153,0.12)' : saveStatus === 'saving' ? 'rgba(251,191,36,0.12)' : 'rgba(249,115,22,0.15)', color: saveStatus === 'saved' ? '#34d399' : saveStatus === 'saving' ? '#fbbf24' : '#fb923c' }}>
           {saveStatus === 'saved' ? '✓ Saved' : saveStatus === 'saving' ? 'Saving…' : '● Unsaved'}
         </span>
+        <button onClick={() => setShowChat(p => !p)} className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded transition-all ${showChat ? 'text-indigo-300' : 'text-white/30 hover:text-white/60'}`} style={{ background: showChat ? 'rgba(99,102,241,0.15)' : 'transparent' }}>
+          <BsRobot size={11} /> AI
+        </button>
       </div>
 
-      {/* Ribbon: Row 1 — File & Edit menus */}
-      <div className="no-print bg-white border-b border-gray-200 shadow-sm shrink-0">
-        <div className="flex items-center gap-1 px-3 py-1 border-b border-gray-100">
-          <DropdownBtn label={<><BsFileEarmark size={12} className="mr-1" /> File</>} width={200}>
+      {/* ── Ribbon row 1: Menus + quick actions ── */}
+      <div className="no-print border-b shrink-0" style={{ background: '#0c0f17', borderColor: 'rgba(255,255,255,0.08)' }}>
+        <div className="flex items-center gap-0.5 px-3 py-1 border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+          <DarkDropdown label={<><BsFileEarmark size={11} className="mr-1" />File</>} width={210}>
             <div className="py-1">
-              <button onMouseDown={e => { e.preventDefault(); saveDoc(); }} className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700"><BsFileEarmark size={11} /> New Document</button>
-              <button onMouseDown={e => { e.preventDefault(); saveDoc(); }} className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700"><BsFileEarmarkText size={11} /> Save</button>
-              <div className="my-1 border-t border-gray-100" />
-              <button onMouseDown={e => { e.preventDefault(); exportHTML(); }} className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700"><BsDownload size={11} /> Export as HTML</button>
-              <button onMouseDown={e => { e.preventDefault(); exportTXT(); }} className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700"><BsDownload size={11} /> Export as TXT</button>
-              <button onMouseDown={e => { e.preventDefault(); window.print(); }} className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700"><BsPrinter size={11} /> Print / Save PDF</button>
+              <DropdownItem onSelect={saveDoc}><BsFileEarmarkText size={11} /> Save</DropdownItem>
+              <div className="my-0.5 mx-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }} />
+              <DropdownItem onSelect={exportHTML}><BsDownload size={11} /> Export as HTML</DropdownItem>
+              <DropdownItem onSelect={exportTXT}><BsDownload size={11} /> Export as TXT</DropdownItem>
+              <DropdownItem onSelect={() => window.print()}><BsPrinter size={11} /> Print / Save PDF</DropdownItem>
             </div>
-          </DropdownBtn>
+          </DarkDropdown>
 
-          <DropdownBtn label={<><BsScissors size={12} className="mr-1" /> Edit</>} width={180}>
+          <DarkDropdown label={<><BsScissors size={11} className="mr-1" />Edit</>} width={190}>
             <div className="py-1">
-              <button onMouseDown={e => { e.preventDefault(); document.execCommand('cut'); }} className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700"><BsScissors size={11} /> Cut</button>
-              <button onMouseDown={e => { e.preventDefault(); document.execCommand('copy'); }} className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700"><BsFiles size={11} /> Copy</button>
-              <button onMouseDown={e => { e.preventDefault(); document.execCommand('paste'); }} className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700"><BsClipboard size={11} /> Paste</button>
-              <div className="my-1 border-t border-gray-100" />
-              <button onMouseDown={e => { e.preventDefault(); editor.chain().focus().undo().run(); }} className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700"><BsArrowCounterclockwise size={11} /> Undo</button>
-              <button onMouseDown={e => { e.preventDefault(); editor.chain().focus().redo().run(); }} className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700"><BsArrowClockwise size={11} /> Redo</button>
+              <DropdownItem onSelect={() => document.execCommand('cut')}><BsScissors size={11} /> Cut</DropdownItem>
+              <DropdownItem onSelect={() => document.execCommand('copy')}><BsFiles size={11} /> Copy</DropdownItem>
+              <DropdownItem onSelect={() => document.execCommand('paste')}><BsClipboard size={11} /> Paste</DropdownItem>
+              <div className="my-0.5 mx-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }} />
+              <DropdownItem onSelect={() => editor.chain().focus().undo().run()}><BsArrowCounterclockwise size={11} /> Undo</DropdownItem>
+              <DropdownItem onSelect={() => editor.chain().focus().redo().run()}><BsArrowClockwise size={11} /> Redo</DropdownItem>
             </div>
-          </DropdownBtn>
+          </DarkDropdown>
 
-          <DropdownBtn label={<><BsCardText size={12} className="mr-1" /> Insert</>} width={200}>
+          <DarkDropdown label={<><BsCardText size={11} className="mr-1" />Insert</>} width={210}>
             <div className="py-1">
-              <button onMouseDown={e => { e.preventDefault(); insertTable(); }} className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700"><BsTable size={11} /> Insert Table</button>
-              <button onMouseDown={e => { e.preventDefault(); addImage(); }} className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700"><BsImage size={11} /> Insert Image</button>
-              <button onMouseDown={e => { e.preventDefault(); setLink(); }} className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700"><BsLink45Deg size={11} /> Insert Hyperlink</button>
-              <button onMouseDown={e => { e.preventDefault(); editor.chain().focus().setHorizontalRule().run(); }} className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700">— Page Separator</button>
-              <button onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleBlockquote().run(); }} className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700">❝ Blockquote</button>
+              <DropdownItem onSelect={insertTable}><BsTable size={11} /> Table</DropdownItem>
+              <DropdownItem onSelect={addImage}><BsImage size={11} /> Image</DropdownItem>
+              <DropdownItem onSelect={setLink}><BsLink45Deg size={11} /> Hyperlink</DropdownItem>
+              <DropdownItem onSelect={() => editor.chain().focus().setHorizontalRule().run()}>— Page Separator</DropdownItem>
+              <DropdownItem onSelect={() => editor.chain().focus().toggleBlockquote().run()}>❝ Blockquote</DropdownItem>
             </div>
-          </DropdownBtn>
+          </DarkDropdown>
 
-          <DropdownBtn label={<><BsFonts size={12} className="mr-1" /> Format</>} width={200}>
+          <DarkDropdown label={<><BsFonts size={11} className="mr-1" />Format</>} width={200}>
             <div className="py-1">
-              <div className="px-3 py-1 text-[10px] text-gray-400 font-semibold uppercase">Line Spacing</div>
+              <div className="px-3 py-1 text-[9px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.2)' }}>Line Spacing</div>
               {LINE_SPACINGS.map(ls => (
-                <button key={ls.value} onMouseDown={e => { e.preventDefault(); setLineSpacing(ls.value); }} className={`flex items-center gap-2 w-full px-3 py-1 text-xs hover:bg-blue-50 hover:text-blue-700 ${lineSpacing === ls.value ? 'text-blue-600 font-medium' : 'text-gray-700'}`}>
-                  {lineSpacing === ls.value ? '✓' : <span className="w-3" />} {ls.label}
-                </button>
+                <DropdownItem key={ls.value} onSelect={() => setLineSpacing(ls.value)} active={lineSpacing === ls.value}>
+                  {lineSpacing === ls.value ? '✓' : <span className="w-3 inline-block" />} {ls.label}
+                </DropdownItem>
               ))}
-              <div className="my-1 border-t border-gray-100" />
-              <div className="px-3 py-1 text-[10px] text-gray-400 font-semibold uppercase">Zoom</div>
+              <div className="my-0.5 mx-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }} />
+              <div className="px-3 py-1 text-[9px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.2)' }}>Zoom</div>
               {[75, 100, 125, 150, 200].map(z => (
-                <button key={z} onMouseDown={e => { e.preventDefault(); setZoom(z); }} className={`flex items-center gap-2 w-full px-3 py-1 text-xs hover:bg-blue-50 hover:text-blue-700 ${zoom === z ? 'text-blue-600 font-medium' : 'text-gray-700'}`}>
-                  {zoom === z ? '✓' : <span className="w-3" />} {z}%
-                </button>
+                <DropdownItem key={z} onSelect={() => setZoom(z)} active={zoom === z}>
+                  {zoom === z ? '✓' : <span className="w-3 inline-block" />} {z}%
+                </DropdownItem>
               ))}
             </div>
-          </DropdownBtn>
+          </DarkDropdown>
 
           <ToolbarDivider />
-
-          <ToolBtn onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} title="Undo (Ctrl+Z)"><BsArrowCounterclockwise size={13} /></ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} title="Redo (Ctrl+Y)"><BsArrowClockwise size={13} /></ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} title="Undo (Ctrl+Z)"><BsArrowCounterclockwise size={12} /></ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} title="Redo (Ctrl+Y)"><BsArrowClockwise size={12} /></ToolBtn>
           <ToolbarDivider />
-          <ToolBtn onClick={saveDoc} title="Save"><BsFileEarmarkText size={13} /></ToolBtn>
-          <ToolBtn onClick={() => window.print()} title="Print / Export PDF"><BsPrinter size={13} /></ToolBtn>
+          <ToolBtn onClick={saveDoc} title="Save"><BsFileEarmarkText size={12} /></ToolBtn>
+          <ToolBtn onClick={() => window.print()} title="Print / Export PDF"><BsPrinter size={12} /></ToolBtn>
         </div>
 
         {/* Row 2: Formatting toolbar */}
         <div className="flex items-center gap-0.5 px-3 py-1 flex-wrap">
-
-          {/* Style preset */}
           <select
             value={h}
             onChange={e => {
@@ -362,8 +466,8 @@ export default function DocumentEditor({ content, onChange, projectName, project
               if (val === '0') editor.chain().focus().setParagraph().run();
               else editor.chain().focus().toggleHeading({ level: Number(val) as 1 | 2 | 3 | 4 }).run();
             }}
-            className="h-7 text-xs px-1.5 rounded border border-gray-200 bg-white text-gray-700 outline-none focus:border-blue-400 mr-1"
-            style={{ minWidth: 110 }}
+            className="h-7 text-xs px-1.5 rounded outline-none mr-1"
+            style={{ minWidth: 110, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)' }}
           >
             <option value="0">Normal Text</option>
             <option value="1">Heading 1</option>
@@ -372,108 +476,165 @@ export default function DocumentEditor({ content, onChange, projectName, project
             <option value="4">Heading 4</option>
           </select>
 
-          {/* Font family */}
-          <DropdownBtn
-            label={<span className="text-xs font-medium" style={{ fontFamily }}>{FONT_FAMILIES.find(f => f.value === fontFamily)?.label || 'Font'}</span>}
-            width={200}
-          >
+          <DarkDropdown label={<span className="text-xs" style={{ fontFamily }}>{FONT_FAMILIES.find(f => f.value === fontFamily)?.label || 'Font'}</span>} width={200}>
             {FONT_FAMILIES.map(f => (
-              <button key={f.value} onMouseDown={e => { e.preventDefault(); applyFontFamily(f.value); }} className={`flex items-center w-full px-3 py-1.5 text-xs hover:bg-blue-50 ${fontFamily === f.value ? 'text-blue-600 font-semibold' : 'text-gray-700'}`} style={{ fontFamily: f.value }}>
-                {fontFamily === f.value ? '✓ ' : ''}{f.label}
-              </button>
+              <DropdownItem key={f.value} onSelect={() => applyFontFamily(f.value)} active={fontFamily === f.value}>
+                <span style={{ fontFamily: f.value }}>{fontFamily === f.value ? '✓ ' : ''}{f.label}</span>
+              </DropdownItem>
             ))}
-          </DropdownBtn>
+          </DarkDropdown>
 
-          {/* Font size */}
-          <DropdownBtn label={<span className="text-xs font-medium">{fontSize}</span>} width={90}>
+          <DarkDropdown label={<span className="text-xs font-medium">{fontSize}</span>} width={90}>
             {FONT_SIZES.map(s => (
-              <button key={s} onMouseDown={e => { e.preventDefault(); applyFontSize(s); }} className={`flex items-center w-full px-3 py-1.5 text-xs hover:bg-blue-50 ${fontSize === s ? 'text-blue-600 font-semibold' : 'text-gray-700'}`}>
+              <DropdownItem key={s} onSelect={() => applyFontSize(s)} active={fontSize === s}>
                 {fontSize === s ? '✓ ' : ''}{s}
-              </button>
+              </DropdownItem>
             ))}
-          </DropdownBtn>
+          </DarkDropdown>
 
           <ToolbarDivider />
-
-          <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="Bold (Ctrl+B)"><BsTypeBold size={14} /></ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="Italic (Ctrl+I)"><BsTypeItalic size={14} /></ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title="Underline (Ctrl+U)"><BsTypeUnderline size={14} /></ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="Strikethrough"><BsTypeStrikethrough size={14} /></ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="Bold"><BsTypeBold size={13} /></ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="Italic"><BsTypeItalic size={13} /></ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title="Underline"><BsTypeUnderline size={13} /></ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="Strikethrough"><BsTypeStrikethrough size={13} /></ToolBtn>
 
           <ToolbarDivider />
 
           {/* Text color */}
-          <div className="relative flex flex-col items-center justify-center w-7 h-7 rounded hover:bg-gray-100 cursor-pointer transition-all" title="Text Color">
-            <BsPaintBucket size={12} className="text-gray-600" />
-            <div className="w-5 h-1 rounded-sm" style={{ background: '#111827' }} />
-            <input type="color" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={e => editor.chain().focus().setColor(e.target.value).run()} title="Text color" />
+          <div className="relative flex flex-col items-center justify-center w-7 h-7 rounded cursor-pointer transition-all hover:bg-white/6" title="Text Color">
+            <BsPaintBucket size={11} style={{ color: 'rgba(255,255,255,0.55)' }} />
+            <div className="w-4 h-0.5 rounded-sm mt-0.5" style={{ background: '#818cf8' }} />
+            <input type="color" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={e => editor.chain().focus().setColor(e.target.value).run()} />
           </div>
 
           {/* Highlight */}
-          <div className="relative flex flex-col items-center justify-center w-7 h-7 rounded hover:bg-gray-100 cursor-pointer transition-all" title="Highlight Color">
-            <BsHighlighter size={12} className="text-gray-600" />
-            <div className="w-5 h-1 rounded-sm" style={{ background: '#fef08a' }} />
-            <input type="color" defaultValue="#fef08a" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={e => editor.chain().focus().toggleHighlight({ color: e.target.value }).run()} title="Highlight color" />
+          <div className="relative flex flex-col items-center justify-center w-7 h-7 rounded cursor-pointer transition-all hover:bg-white/6" title="Highlight">
+            <BsHighlighter size={11} style={{ color: 'rgba(255,255,255,0.55)' }} />
+            <div className="w-4 h-0.5 rounded-sm mt-0.5" style={{ background: '#fef08a' }} />
+            <input type="color" defaultValue="#fef08a" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={e => editor.chain().focus().toggleHighlight({ color: e.target.value }).run()} />
           </div>
 
           <ToolbarDivider />
-
-          <ToolBtn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="Align Left"><BsTextLeft size={14} /></ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title="Center"><BsTextCenter size={14} /></ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title="Align Right"><BsTextRight size={14} /></ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().setTextAlign('justify').run()} active={editor.isActive({ textAlign: 'justify' })} title="Justify"><BsJustify size={14} /></ToolBtn>
-
-          <ToolbarDivider />
-
-          <ToolBtn onClick={() => editor.chain().focus().sinkListItem('listItem').run()} title="Increase Indent"><BsTextIndentLeft size={14} /></ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().liftListItem('listItem').run()} title="Decrease Indent"><BsTextIndentRight size={14} /></ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} title="Align Left"><BsTextLeft size={13} /></ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} title="Center"><BsTextCenter size={13} /></ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} title="Align Right"><BsTextRight size={13} /></ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().setTextAlign('justify').run()} active={editor.isActive({ textAlign: 'justify' })} title="Justify"><BsJustify size={13} /></ToolBtn>
 
           <ToolbarDivider />
-
-          <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="Bulleted List"><BsListUl size={14} /></ToolBtn>
-          <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="Numbered List"><BsListOl size={14} /></ToolBtn>
-
+          <ToolBtn onClick={() => editor.chain().focus().sinkListItem('listItem').run()} title="Indent"><BsTextIndentLeft size={13} /></ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().liftListItem('listItem').run()} title="Outdent"><BsTextIndentRight size={13} /></ToolBtn>
           <ToolbarDivider />
-
-          <ToolBtn onClick={addImage} title="Insert Image"><BsImage size={14} /></ToolBtn>
-          <ToolBtn onClick={insertTable} title="Insert Table"><BsTable size={14} /></ToolBtn>
-          <ToolBtn onClick={setLink} active={editor.isActive('link')} title="Insert Hyperlink"><BsLink45Deg size={14} /></ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')} title="Bullet List"><BsListUl size={13} /></ToolBtn>
+          <ToolBtn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')} title="Numbered List"><BsListOl size={13} /></ToolBtn>
+          <ToolbarDivider />
+          <ToolBtn onClick={addImage} title="Image"><BsImage size={13} /></ToolBtn>
+          <ToolBtn onClick={insertTable} title="Table"><BsTable size={13} /></ToolBtn>
+          <ToolBtn onClick={setLink} active={editor.isActive('link')} title="Link"><BsLink45Deg size={13} /></ToolBtn>
         </div>
       </div>
 
-      {/* Ruler */}
-      <div className="no-print h-5 bg-gray-300 border-b border-gray-400 shrink-0 flex items-center overflow-hidden">
+      {/* ── Ruler ── */}
+      <div className="no-print h-5 shrink-0 flex items-center overflow-hidden" style={{ background: '#0a0d15', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="flex items-end gap-0 mx-auto" style={{ width: `${Math.min(816 * zoom / 100, 900)}px` }}>
           {Array.from({ length: 17 }, (_, i) => (
             <div key={i} className="flex-1 flex flex-col items-center">
-              <div className="text-[7px] text-gray-500 leading-none">{i > 0 ? i : ''}</div>
-              <div className="w-px bg-gray-500" style={{ height: i % 2 === 0 ? 6 : 4 }} />
+              <div className="text-[7px] leading-none" style={{ color: 'rgba(255,255,255,0.2)' }}>{i > 0 ? i : ''}</div>
+              <div className="w-px" style={{ height: i % 2 === 0 ? 6 : 4, background: 'rgba(255,255,255,0.15)' }} />
             </div>
           ))}
         </div>
       </div>
 
-      {/* Page Canvas */}
-      <div className="flex-1 overflow-auto py-8 px-4" style={{ background: '#d1d5db' }}>
-        <div
-          className="mx-auto bg-white shadow-2xl"
-          style={{
-            width: `${816 * zoom / 100}px`,
-            minHeight: `${1056 * zoom / 100}px`,
-            padding: `${Math.round(96 * zoom / 100)}px`,
-          }}
-        >
-          <EditorContent editor={editor} />
+      {/* ── Main area ── */}
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* Page canvas */}
+        <div className="flex-1 overflow-auto py-8 px-4" style={{ background: '#141820' }}>
+          <div
+            className="mx-auto bg-white shadow-2xl"
+            style={{
+              width: `${816 * zoom / 100}px`,
+              minHeight: `${1056 * zoom / 100}px`,
+              padding: `${Math.round(96 * zoom / 100)}px`,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+            }}
+          >
+            <EditorContent editor={editor} />
+          </div>
         </div>
+
+        {/* ── AI Chat Panel ── */}
+        {showChat && (
+          <div className="flex flex-col shrink-0 border-l" style={{ width: 290, borderColor: 'rgba(255,255,255,0.08)', background: '#0a0d15' }}>
+            <div className="h-8 flex items-center justify-between px-3 border-b shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)', background: '#0c0f17' }}>
+              <div className="flex items-center gap-1.5">
+                <BsRobot size={11} className="text-indigo-400" />
+                <span className="text-[10px] font-semibold text-white/60">AI Writing Assistant</span>
+              </div>
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: aiLoading ? '#fbbf24' : '#34d399' }} />
+            </div>
+
+            <div className="flex-1 overflow-auto p-2 space-y-2">
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex gap-1.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                  <div className={`w-5 h-5 rounded flex items-center justify-center text-[8px] shrink-0 font-bold mt-0.5 ${msg.role === 'assistant' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-600/40 text-slate-300'}`}>
+                    {msg.role === 'assistant' ? 'AI' : 'U'}
+                  </div>
+                  <div className="flex flex-col gap-1 max-w-[85%]">
+                    <div className={`rounded-xl px-2.5 py-1.5 text-[11px] leading-relaxed whitespace-pre-wrap break-words ${msg.role === 'assistant' ? 'bg-white/4 text-white/75' : 'bg-indigo-600/20 text-indigo-200'}`}>
+                      {msg.content}
+                    </div>
+                    {msg.insertable && (
+                      <button
+                        onClick={() => insertAIContent(msg.insertable!)}
+                        className="flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-lg self-start transition-all"
+                        style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }}
+                      >
+                        <BsPlusCircle size={10} /> Insert into document
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {aiLoading && (
+                <div className="flex gap-1.5">
+                  <div className="w-5 h-5 rounded bg-indigo-500/20 text-indigo-300 flex items-center justify-center text-[8px] font-bold shrink-0">AI</div>
+                  <div className="px-2.5 py-1.5 bg-white/4 rounded-xl flex gap-1 items-center">
+                    {[0, 1, 2].map(i => <div key={i} className="w-1 h-1 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            <div className="p-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+              <div className="flex gap-1.5 items-end rounded-xl border px-2 py-1.5" style={{ borderColor: 'rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)' }}>
+                <textarea
+                  value={chatInput} onChange={e => setChatInput(e.target.value)}
+                  placeholder="Draft intro, improve paragraph, suggest title…"
+                  rows={2}
+                  className="flex-1 bg-transparent text-[11px] resize-none outline-none text-white/70 placeholder-white/20"
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                />
+                <button onClick={sendMessage} disabled={aiLoading || !chatInput.trim()}
+                  className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                  style={{ background: aiLoading || !chatInput.trim() ? 'rgba(255,255,255,0.05)' : '#6366f1', color: aiLoading || !chatInput.trim() ? 'rgba(255,255,255,0.2)' : '#fff' }}>
+                  {aiLoading ? <BsArrowRepeat size={12} className="animate-spin" /> : <BsRobot size={12} />}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Status Bar */}
-      <div className="no-print flex items-center gap-4 px-4 h-6 bg-blue-700 text-white/80 text-xs shrink-0">
+      {/* ── Status Bar ── */}
+      <div className="no-print flex items-center gap-4 px-4 h-6 shrink-0 border-t text-[10px]" style={{ background: '#0c0f17', borderColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.3)' }}>
         <span>{wordCount.toLocaleString()} words</span>
-        <span>{charCount.toLocaleString()} characters</span>
+        <span>{charCount.toLocaleString()} chars</span>
         <div className="flex-1" />
-        <span>Zoom: {zoom}%</span>
-        <input type="range" min={50} max={200} step={25} value={zoom} onChange={e => setZoom(Number(e.target.value))} className="w-20 h-1 accent-white cursor-pointer" />
+        <span>Zoom {zoom}%</span>
+        <input type="range" min={50} max={200} step={25} value={zoom} onChange={e => setZoom(Number(e.target.value))} className="w-16 h-1 accent-indigo-400 cursor-pointer" />
+        <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
         <span>Print Layout</span>
       </div>
     </div>
