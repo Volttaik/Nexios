@@ -1,20 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
+import { runCommandInSandbox } from '@/lib/sandbox/SandboxManager';
 
-const execAsync = promisify(exec);
 const BASE_DIR = '/tmp/nexios-workspaces';
 
-// Commands that should never be allowed
-const BLOCKED = ['sudo', 'su', 'passwd', 'shutdown', 'reboot', 'halt', 'init', 'systemctl', 'rm -rf /'];
+const BLOCKED_PATTERNS = [
+  'sudo',
+  'su ',
+  'passwd',
+  'shutdown',
+  'reboot',
+  'halt',
+  'init ',
+  'systemctl',
+  'rm -rf /',
+  'mkfs',
+  'dd if=',
+  ':(){:|:&};:',
+];
 
 function isBlocked(cmd: string): boolean {
-  return BLOCKED.some(b => cmd.includes(b));
+  return BLOCKED_PATTERNS.some(p => cmd.includes(p));
 }
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const { id } = await params;
   const workspaceDir = path.join(BASE_DIR, id);
   fs.mkdirSync(workspaceDir, { recursive: true });
@@ -22,33 +35,36 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let command: string;
   try {
     const body = await req.json();
-    command = body.command?.trim() || '';
+    command = (body.command ?? '').trim();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  if (!command) return NextResponse.json({ stdout: '', stderr: '', code: 0 });
+  if (!command) {
+    return NextResponse.json({ stdout: '', stderr: '', code: 0 });
+  }
 
   if (isBlocked(command)) {
-    return NextResponse.json({ stdout: '', stderr: `Command blocked for security: ${command.split(' ')[0]}`, code: 1 });
+    return NextResponse.json({
+      stdout: '',
+      stderr: `Command blocked for security: ${command.split(' ')[0]}`,
+      code: 1,
+    });
   }
 
-  try {
-    const { stdout, stderr } = await execAsync(command, {
-      cwd: workspaceDir,
-      timeout: 30000,
-      env: {
-        ...process.env,
-        HOME: workspaceDir,
-        PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/nix/var/nix/profiles/default/bin',
-      },
-      maxBuffer: 1024 * 1024 * 5,
+  const result = await runCommandInSandbox(workspaceDir, command, 60000);
+
+  if (result.timedOut) {
+    return NextResponse.json({
+      stdout: result.stdout,
+      stderr: 'Command timed out after 60s — container killed',
+      code: 124,
     });
-    return NextResponse.json({ stdout, stderr, code: 0 });
-  } catch (err: any) {
-    const stdout = err.stdout || '';
-    const stderr = err.stderr || err.message || 'Command failed';
-    const code = err.code || 1;
-    return NextResponse.json({ stdout, stderr, code });
   }
+
+  return NextResponse.json({
+    stdout: result.stdout,
+    stderr: result.stderr,
+    code: result.code,
+  });
 }

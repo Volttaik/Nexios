@@ -95,6 +95,51 @@ Both the **Document Editor** and **Design Editor** share the same core editing i
 
 The difference is in the tools exposed and the rendering layer — not the editing engine itself.
 
+### Docker-Inspired Sandbox System (`lib/sandbox/`)
+
+The execution system is architected like Docker but runs on the available Nix runtimes:
+
+**Files:**
+- `lib/sandbox/types.ts` — TypeScript interfaces (ExecutionPlan, ContainerInstance, SandboxEvent, ExecResult)
+- `lib/sandbox/RuntimeRegistry.ts` — Auto-discovers binary paths (node, npm, python3, pip3, go, bash) via `which`
+- `lib/sandbox/SmartRunner.ts` — Project type detection → ExecutionPlan (image, setupCommands, runCommand)
+- `lib/sandbox/SandboxManager.ts` — Process-based "container" management with SSE streaming, timeouts, cleanup
+- `lib/sandbox/dockerfiles/nodejs.Dockerfile` — Node.js 20 image definition
+- `lib/sandbox/dockerfiles/python.Dockerfile` — Python 3.11 image definition
+- `lib/sandbox/dockerfiles/static.Dockerfile` — Static web server image definition
+
+**Container Images (virtual):**
+
+| Image | Runtime | Description |
+|-------|---------|-------------|
+| `nexios/nodejs:20` | Node.js v20.20.0 | Node.js, npm 10, full npm ecosystem |
+| `nexios/python:3.11` | Python 3.11.13 | Python 3.11, pip 25, venv isolation |
+| `nexios/go:1.24` | Go 1.24 | Go compiler and tools |
+| `nexios/static:serve` | Browser | Static HTML — no execution, iframe preview |
+| `nexios/shell:bash` | Bash | Generic shell commands |
+
+**Container Lifecycle:**
+1. SmartRunner analyzes project files → produces ExecutionPlan
+2. SandboxManager "pulls" the appropriate image (log message)
+3. SandboxManager "mounts" workspace directory as `/workspace` volume
+4. Setup commands run (`npm install`, `python3 -m venv .venv`, `pip install`)
+5. Main command spawns with SSE streaming of stdout/stderr
+6. Container auto-stops on exit or timeout
+7. Container ID tracked in in-memory registry
+
+**Python Dependency Management:**
+When `requirements.txt` is detected, the sandbox creates a `.venv` virtual environment inside the workspace and installs packages with `pip`. The venv is reused on subsequent runs. This avoids the Nix immutable store restriction.
+
+**Real-time Streaming:**
+The `/api/workspace/[id]/run` POST endpoint returns `text/event-stream` (SSE) instead of JSON. Each event is a JSON object with `type`, `text`, and `timestamp`:
+- `info` — Container lifecycle messages
+- `setup` — Setup command output
+- `stdout` — Process standard output
+- `stderr` — Process standard error
+- `exit` — Container exit with code
+
+The frontend reads the stream via `fetch()` + `ReadableStream.getReader()` and appends each event to the terminal in real time.
+
 ### Smart Run System (`/api/workspace/[id]/run`)
 
 The run API intelligently detects project type and runs it correctly:

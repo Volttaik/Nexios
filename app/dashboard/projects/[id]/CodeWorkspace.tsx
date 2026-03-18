@@ -479,8 +479,8 @@ export default function CodeWorkspace({ project }: Props) {
     setIsRunning(true);
     setBrowserPreview(null);
     setPanelTab('terminal');
-    setTermLines(p => [...p, { type: 'info', text: '─── Running project ───' }]);
-    addActivity('terminal', 'Running project...');
+    setTermLines(p => [...p, { type: 'info', text: '─── Sandbox starting ───' }]);
+    addActivity('terminal', 'Starting sandbox container...');
 
     try {
       const res = await fetch(`/api/workspace/${id}/run`, {
@@ -488,32 +488,73 @@ export default function CodeWorkspace({ project }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entryPoint: selectedPath || undefined }),
       });
-      const data = await res.json();
-      const runtime = data.runtime || 'Unknown';
 
-      // HTML files open in browser preview — never executed as scripts
-      if (data.type === 'browser-preview') {
-        setBrowserPreview({ html: data.htmlContent, file: data.entryFile });
-        setTermLines(p => [
-          ...p,
-          { type: 'success', text: `[Browser] Opening ${data.entryFile} in preview` },
-          { type: 'output', text: '  Close the preview panel to return to the editor.' },
-        ]);
-        addActivity('info', `Browser preview: ${data.entryFile}`);
+      const contentType = res.headers.get('content-type') || '';
+
+      if (contentType.includes('application/json')) {
+        const data = await res.json();
+        if (data.type === 'browser-preview') {
+          setBrowserPreview({ html: data.htmlContent, file: data.entryFile });
+          setTermLines(p => [
+            ...p,
+            { type: 'success', text: `[Browser] Opening ${data.entryFile} in preview` },
+            { type: 'output', text: '  Close the preview panel to return to the editor.' },
+          ]);
+          addActivity('info', `Browser preview: ${data.entryFile}`);
+        } else {
+          setTermLines(p => [...p, { type: 'error', text: data.output || 'Run failed' }]);
+        }
         setIsRunning(false);
         return;
       }
 
-      setTermLines(p => [
-        ...p,
-        { type: 'success', text: `[${runtime}] ${data.command || ''}` },
-      ]);
-      if (data.output) {
-        data.output.split('\n').filter(Boolean).forEach((line: string) =>
-          setTermLines(p => [...p, { type: data.code === 0 ? 'output' : 'error', text: line }])
-        );
+      if (!res.body) {
+        setTermLines(p => [...p, { type: 'error', text: 'No response body from sandbox' }]);
+        setIsRunning(false);
+        return;
       }
-      setTermLines(p => [...p, { type: data.code === 0 ? 'success' : 'error', text: `─── Exited (${data.code}) ───` }]);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() ?? '';
+
+        for (const part of parts) {
+          for (const line of part.split('\n')) {
+            if (!line.startsWith('data: ')) continue;
+            try {
+              const event = JSON.parse(line.slice(6)) as {
+                type: string; text: string; code?: number;
+              };
+              if (event.type === 'stdout') {
+                setTermLines(p => [...p, { type: 'output', text: event.text }]);
+              } else if (event.type === 'stderr') {
+                setTermLines(p => [...p, { type: 'error', text: event.text }]);
+              } else if (event.type === 'setup') {
+                setTermLines(p => [...p, { type: 'info', text: event.text }]);
+              } else if (event.type === 'info') {
+                setTermLines(p => [...p, { type: 'info', text: event.text }]);
+              } else if (event.type === 'error') {
+                setTermLines(p => [...p, { type: 'error', text: event.text }]);
+              } else if (event.type === 'exit') {
+                const code = event.code ?? 0;
+                setTermLines(p => [
+                  ...p,
+                  { type: code === 0 ? 'success' : 'error', text: `─── Container exited (${code}) ───` },
+                ]);
+                addActivity(code === 0 ? 'done' : 'error', `Container exited (${code})`);
+              }
+            } catch { }
+          }
+        }
+      }
     } catch {
       setTermLines(p => [...p, { type: 'error', text: 'Run failed: network error' }]);
     } finally {
