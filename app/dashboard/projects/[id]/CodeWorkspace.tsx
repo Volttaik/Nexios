@@ -309,10 +309,9 @@ export default function CodeWorkspace({ project }: Props) {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const [termLines, setTermLines] = useState<TerminalLine[]>([
-    { type: 'info', text: '  Nexios Shell — Replit-style terminal' },
+    { type: 'info', text: '  Nexios AI Terminal' },
     { type: 'info', text: '─────────────────────────────────────' },
-    { type: 'success', text: '  Node.js, Python, git available' },
-    { type: 'output', text: '  Type any command below, or press ▶ Run' },
+    { type: 'output', text: '  Type commands below, or press ▶ Run to execute your project' },
     { type: 'output', text: '' },
   ]);
   const [termInput, setTermInput] = useState('');
