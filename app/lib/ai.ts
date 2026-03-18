@@ -26,6 +26,7 @@ export async function callAI(
     case 'anthropic': return callAnthropic(model, messages, apiKey);
     case 'mistral':   return callMistral(model, messages, apiKey);
     case 'xai':       return callXAI(model, messages, apiKey);
+    case 'replit':    return callReplit(model, messages, apiKey);
     default:          return callGemini(model, messages, apiKey);
   }
 }
@@ -284,6 +285,54 @@ async function callXAI(model: string, messages: ChatMessage[], apiKey: string): 
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes('Failed to fetch') || msg.includes('network')) return '⚠️ **Network error** connecting to xAI. Check your connection.';
     return `⚠️ xAI Grok error: ${msg}`;
+  }
+}
+
+async function callReplit(model: string, messages: ChatMessage[], apiKey: string): Promise<string> {
+  if (!apiKey) return '⚠️ **Anthropic API key required for Replit Agent.** Add your `sk-ant-...` key in Settings → AI Providers → Replit Agent. Get one at [console.anthropic.com](https://console.anthropic.com).';
+  try {
+    const anthropicMessages = messages.map(m => {
+      if (m.role === 'user' && m.imageBase64List?.length) {
+        return {
+          role: 'user',
+          content: [
+            ...m.imageBase64List.map(img => {
+              const match = img.match(/^data:([^;]+);base64,(.+)$/);
+              return {
+                type: 'image',
+                source: { type: 'base64', media_type: match ? match[1] : 'image/jpeg', data: match ? match[2] : img },
+              };
+            }),
+            { type: 'text', text: m.content || 'Describe this image.' },
+          ],
+        };
+      }
+      return { role: m.role, content: m.content };
+    });
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({ model, messages: anthropicMessages, max_tokens: 8192 }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    return data.content?.[0]?.text || 'No response generated.';
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('401')) return '⚠️ **Invalid API key** for Replit Agent. Check your Anthropic key (`sk-ant-...`) in Settings → AI Providers.';
+    if (msg.includes('429') || msg.includes('overloaded')) return '⚠️ **Rate limit exceeded.** Try again in a moment, or switch to Groq (free).';
+    if (msg.includes('model')) return `⚠️ Model "${model}" unavailable. Try Replit Agent 3.5 instead.`;
+    return `⚠️ Replit Agent error: ${msg}`;
   }
 }
 

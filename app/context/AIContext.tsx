@@ -34,10 +34,12 @@ export const AI_PROVIDERS: AIProvider[] = [
     apiKeyPlaceholder: 'AIza...',
     icon: 'G',
     models: [
+      { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', description: 'Most capable, deep reasoning', supportsImages: true, supportsCode: true },
+      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Fast & highly capable', supportsImages: true, supportsCode: true },
       { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Fastest, multimodal', supportsImages: true, supportsCode: true },
       { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite', description: 'Ultra-fast, free tier', supportsImages: true, supportsCode: true, free: true },
       { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Fast & efficient', supportsImages: true, supportsCode: true },
-      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', description: 'Most capable', supportsImages: true, supportsCode: true },
+      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', description: 'Stable & powerful', supportsImages: true, supportsCode: true },
     ],
   },
   {
@@ -118,6 +120,23 @@ export const AI_PROVIDERS: AIProvider[] = [
       { id: 'grok-2-1212', name: 'Grok 2', description: 'Previous generation', supportsImages: false, supportsCode: true },
     ],
   },
+  {
+    id: 'replit',
+    name: 'Replit Agent',
+    shortName: 'Replit',
+    color: '#F26207',
+    bgGradient: 'from-orange-500 to-amber-400',
+    apiKeyPlaceholder: 'sk-ant-... (Anthropic key)',
+    icon: 'R',
+    isFree: false,
+    freeNote: 'Uses your Anthropic API key — same model that powers Replit Agent',
+    models: [
+      { id: 'claude-sonnet-4-5', name: 'Replit Agent 4 (Sonnet)', description: 'Powers Replit Agent — fast & smart', supportsImages: true, supportsCode: true },
+      { id: 'claude-opus-4-5', name: 'Replit Agent 4 (Opus)', description: 'Maximum intelligence', supportsImages: true, supportsCode: true },
+      { id: 'claude-3-5-sonnet-20241022', name: 'Replit Agent 3.5', description: 'Previous generation', supportsImages: true, supportsCode: true },
+      { id: 'claude-3-5-haiku-20241022', name: 'Replit Agent 3.5 Haiku', description: 'Lightweight & fast', supportsImages: true, supportsCode: true },
+    ],
+  },
 ];
 
 export interface AIProviderConfig {
@@ -140,6 +159,7 @@ const DEFAULT_SETTINGS: AISettings = {
     anthropic: { apiKey: '', selectedModel: 'claude-3-5-sonnet-20241022', enabled: false },
     mistral: { apiKey: '', selectedModel: 'mistral-large-latest', enabled: false },
     xai: { apiKey: '', selectedModel: 'grok-3', enabled: false },
+    replit: { apiKey: '', selectedModel: 'claude-sonnet-4-5', enabled: false },
   },
 };
 

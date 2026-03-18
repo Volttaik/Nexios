@@ -19,6 +19,8 @@ import { useAI } from '@/app/context/AIContext';
 import { callAI } from '@/app/lib/ai';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
+const DocumentEditor = dynamic(() => import('./DocumentEditor'), { ssr: false });
+const DesignEditor = dynamic(() => import('./DesignEditor'), { ssr: false });
 
 // ─────────────────────────── Types ───────────────────────────
 interface FileNode {
@@ -126,12 +128,14 @@ function getAllFileNodes(nodes: FileNode[]): { path: string; content: string }[]
   }
   return result;
 }
-function addFileByPath(nodes: FileNode[], path: string, content: string): FileNode[] {
+// basePath accumulates the full prefix so every node gets its correct absolute path
+function addFileByPath(nodes: FileNode[], path: string, content: string, basePath = ''): FileNode[] {
   const parts = path.split('/');
+  const fullPath = basePath ? `${basePath}/${parts[0]}` : parts[0];
   if (parts.length === 1) {
     const exists = nodes.findIndex(n => n.name === parts[0]);
-    const newNode = createFileNode(parts[0], content);
-    if (exists >= 0) { const r = [...nodes]; r[exists] = { ...r[exists], content }; return r; }
+    const newNode: FileNode = { id: generateId(), name: parts[0], type: 'file', content, language: getLang(parts[0]), path: fullPath };
+    if (exists >= 0) { const r = [...nodes]; r[exists] = { ...r[exists], content, path: fullPath }; return r; }
     return [...nodes, newNode];
   }
   const folderName = parts[0];
@@ -139,11 +143,11 @@ function addFileByPath(nodes: FileNode[], path: string, content: string): FileNo
   const folderIdx = nodes.findIndex(n => n.name === folderName && n.type === 'folder');
   if (folderIdx >= 0) {
     const updated = [...nodes];
-    updated[folderIdx] = { ...updated[folderIdx], children: addFileByPath(updated[folderIdx].children || [], rest, content) };
+    updated[folderIdx] = { ...updated[folderIdx], children: addFileByPath(updated[folderIdx].children || [], rest, content, fullPath) };
     return updated;
   }
-  const newFolder = createFolderNode(folderName);
-  newFolder.children = addFileByPath([], rest, content);
+  const newFolder: FileNode = { id: generateId(), name: folderName, type: 'folder', children: [], path: fullPath };
+  newFolder.children = addFileByPath([], rest, content, fullPath);
   return [...nodes, newFolder];
 }
 
@@ -854,32 +858,93 @@ export default function ProjectWorkspace() {
       setTermLines(p => [...p, { type: 'output', text: `/workspace/${project?.name || id}` }]);
     } else if (command === 'echo') {
       setTermLines(p => [...p, { type: 'output', text: args.join(' ') }]);
-    } else if (command === 'clear') {
+    } else if (command === 'clear' || command === 'cls') {
       setTermLines([]);
+    } else if (command === 'mkdir' && args[0]) {
+      const folderPath = args[args.length - 1] || args[0];
+      setFiles(prev => addFileByPath(prev, `${folderPath}/.gitkeep`, ''));
+      setTermLines(p => [...p, { type: 'success', text: `mkdir: created directory '${folderPath}'` }]);
+    } else if (command === 'cp' && args[0] && args[1]) {
+      const src = findNodeByPath(files, args[0]);
+      if (!src) { setTermLines(p => [...p, { type: 'error', text: `cp: ${args[0]}: No such file` }]); }
+      else { setFiles(prev => addFileByPath(prev, args[1], src.content || '')); setTermLines(p => [...p, { type: 'success', text: `Copied ${args[0]} → ${args[1]}` }]); }
+    } else if (command === 'mv' && args[0] && args[1]) {
+      const src = findNodeByPath(files, args[0]);
+      if (!src) { setTermLines(p => [...p, { type: 'error', text: `mv: ${args[0]}: No such file` }]); }
+      else {
+        setFiles(prev => { const withNew = addFileByPath(prev, args[1], src.content || ''); return deleteNodeByPath(withNew, args[0]); });
+        setTermLines(p => [...p, { type: 'success', text: `Renamed: ${args[0]} → ${args[1]}` }]);
+      }
+    } else if (command === 'wc' && args[0]) {
+      const node = findNodeByPath(files, args[0]);
+      if (!node?.content) { setTermLines(p => [...p, { type: 'error', text: `wc: ${args[0]}: No such file` }]); }
+      else {
+        const lines = node.content.split('\n').length;
+        const words = node.content.split(/\s+/).filter(Boolean).length;
+        const chars = node.content.length;
+        setTermLines(p => [...p, { type: 'output', text: `${lines}\t${words}\t${chars}\t${args[0]}` }]);
+      }
+    } else if (command === 'head' && args[0]) {
+      const node = findNodeByPath(files, args[0]);
+      if (!node?.content) { setTermLines(p => [...p, { type: 'error', text: `head: ${args[0]}: No such file` }]); }
+      else { node.content.split('\n').slice(0, 10).forEach(line => setTermLines(p => [...p, { type: 'output', text: line }])); }
+    } else if (command === 'tail' && args[0]) {
+      const node = findNodeByPath(files, args[0]);
+      if (!node?.content) { setTermLines(p => [...p, { type: 'error', text: `tail: ${args[0]}: No such file` }]); }
+      else { node.content.split('\n').slice(-10).forEach(line => setTermLines(p => [...p, { type: 'output', text: line }])); }
+    } else if (command === 'grep' && args[0] && args[1]) {
+      const node = findNodeByPath(files, args[1]);
+      if (!node?.content) { setTermLines(p => [...p, { type: 'error', text: `grep: ${args[1]}: No such file` }]); }
+      else {
+        const pat = new RegExp(args[0], 'gi');
+        const matched = node.content.split('\n').filter(l => pat.test(l));
+        if (matched.length === 0) setTermLines(p => [...p, { type: 'output', text: '(no matches)' }]);
+        else matched.forEach(line => setTermLines(p => [...p, { type: 'output', text: line }]));
+      }
+    } else if (command === 'env') {
+      [
+        `WORKSPACE=/workspace/${project?.name || id}`,
+        `PROJECT_ID=${id}`,
+        `NODE_ENV=development`,
+        `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`,
+        `LANG=en_US.UTF-8`,
+        `TERM=xterm-256color`,
+      ].forEach(line => setTermLines(p => [...p, { type: 'output', text: line }]));
     } else if (command === 'run') {
       runProject();
       setTermLines(p => [...p, { type: 'success', text: 'Starting project…' }]);
     } else if (command === 'help') {
       [
+        'Nexios Terminal — NixOS Linux (x86_64)',
+        '',
         'Built-in commands:',
-        '  ls                   list workspace files',
+        '  ls [-l]              list workspace files',
         '  cat <file>           show file contents',
         '  touch <file>         create empty file',
         '  rm <file>            delete file',
-        '  pwd                  print directory',
+        '  mkdir <dir>          create directory',
+        '  cp <src> <dst>       copy file',
+        '  mv <src> <dst>       rename / move file',
+        '  pwd                  print working directory',
         '  echo <text>          print text',
+        '  env                  show environment variables',
+        '  wc <file>            word / line count',
+        '  head <file>          first 10 lines',
+        '  tail <file>          last 10 lines',
+        '  grep <pat> <file>    search in file',
         '  run                  run project (auto-detects language)',
-        '  git clone <url>      import GitHub repository',
-        '  clear                clear terminal',
+        '  git clone <url>      clone GitHub repository into workspace',
+        '  clear / cls          clear terminal',
         '',
-        'Real sandbox commands (run on Linux):',
+        'Sandbox commands (run on real NixOS Linux):',
+        '  python3 <file>       run Python 3.11 script',
+        '  pip3 install <pkg>   install Python package',
+        '  node <file>          run Node.js 20 script',
         '  npm install          install Node.js dependencies',
         '  npm run dev          start dev server',
-        '  npm run build        build project',
-        '  node <file>          run JavaScript file',
-        '  python3 <file>       run Python script',
-        '  pip3 install <pkg>   install Python package',
+        '  npm run build        build for production',
         '  npx <tool>           run any npm package',
+        '  bun <file>           run with Bun runtime',
       ].forEach(line => setTermLines(p => [...p, { type: 'output', text: line }]));
     } else if (command === 'git' && args[0] === 'clone' && args[1]) {
       try {
@@ -939,7 +1004,63 @@ export default function ProjectWorkspace() {
       const autonomousContext = autonomousMode
         ? `\n\nAUTONOMOUS MODE: You have full awareness of your own capabilities and can propose self-improvements.` : '';
 
-      const systemPrompt = `You are Nexios AI — a senior full-stack engineer and coding assistant embedded in an IDE with direct file system access. You think before you act, write production-quality code, and always complete the full implementation.
+      // ── Agent Specialisation by project type ──
+      const projectType = project?.type || 'code';
+      const specialisation = projectType === 'document'
+        ? `You are Nexios Doc — a professional writing assistant specialised in technical documentation, reports, articles, and rich-text content.
+
+## DOCUMENT CONTEXT
+Project: "${project?.name || 'Untitled'}"
+Files (${allPaths.length}): ${allPaths.slice(0, 10).join(', ') || 'none'}${fileContext}${autonomousContext}
+
+## YOUR ROLE
+- Help write, edit, proofread, and improve written content
+- Generate markdown files (.md), reports, READMEs, API docs, changelogs, technical specs
+- Suggest structure improvements, headings, summaries, and formatting
+- Use nexios_ops when the user asks you to save content to a file
+
+## FILE OPERATIONS (for saving documents)
+<nexios_ops>
+[{"op": "create", "path": "report.md", "content": "# Report Title\\n\\nContent here..."}]
+</nexios_ops>
+
+## WRITING STANDARDS
+- Clear, concise, well-structured prose
+- Proper headings hierarchy (H1 → H2 → H3)
+- Bullet points and tables where appropriate
+- Technical accuracy for the subject matter
+- If the user asks a question, answer directly — only use ops when saving/creating files`
+
+        : projectType === 'design'
+        ? `You are Nexios Design — a senior UI/UX engineer and design-to-code specialist.
+
+## DESIGN CONTEXT
+Project: "${project?.name || 'Untitled'}"
+Files (${allPaths.length}): ${allPaths.slice(0, 10).join(', ') || 'none'}${fileContext}${autonomousContext}
+
+## YOUR ROLE
+- Convert design concepts into production-ready HTML/CSS/React components
+- Generate SVG assets, CSS animations, design tokens, and component libraries
+- Implement responsive layouts, colour palettes, typography scales, spacing systems
+- Interpret Figma descriptions and create matching code
+- Use nexios_ops to create design files
+
+## FILE OPERATIONS
+<nexios_ops>
+[
+  {"op": "create", "path": "tokens/colors.css", "content": ":root { --primary: #6366f1; }"},
+  {"op": "create", "path": "components/Button.tsx", "content": "export function Button..."}
+]
+</nexios_ops>
+
+## DESIGN STANDARDS
+- Mobile-first, responsive, accessible (WCAG AA)
+- Use CSS custom properties for design tokens
+- Pixel-perfect layouts with precise spacing
+- Smooth transitions and micro-animations
+- Modern colour theory and typography`
+
+        : `You are Nexios AI — a senior full-stack engineer embedded in an IDE with direct file system access. You think before you act, write production-quality code, and always complete the full implementation.
 
 ## PROJECT CONTEXT
 Name: "${project?.name || 'Untitled'}"
@@ -947,7 +1068,7 @@ Language/Stack: ${project?.language || 'Unknown'}
 Files (${allPaths.length}): ${allPaths.slice(0, 20).join(', ') || 'none'}${fileContext}${autonomousContext}
 
 ## FILE OPERATIONS
-You MUST use <nexios_ops> to create or edit files. Never paste code in chat — it goes directly into the file system:
+You MUST use <nexios_ops> to create or edit files. Never paste code in chat:
 
 <nexios_ops>
 [
@@ -961,23 +1082,24 @@ You MUST use <nexios_ops> to create or edit files. Never paste code in chat — 
 ## CORE RULES
 1. ALWAYS use nexios_ops for any file creation or editing — NEVER paste code blocks in chat
 2. Write COMPLETE files — never truncate with "..." or "// rest of code here"
-3. Think step-by-step: understand the full requirement → plan files → write all of them in one ops block
-4. For multi-file projects, create ALL necessary files in a single response (HTML + CSS + JS, or all components)
+3. Think step-by-step: plan files → write all of them in one ops block
+4. For multi-file projects, create ALL necessary files in a single response
 5. Use modern best practices for the detected language/framework
-6. If the user asks a question without requesting code, answer conversationally — no ops needed
+6. If the user asks a question without requesting code, answer conversationally
 7. After applying ops, briefly explain what you built and how to use it
-8. When editing existing files, always include the COMPLETE new file content — not just the changed section
 
 ## LANGUAGE GUIDELINES
 - HTML/CSS/JS: proper DOCTYPE, semantic HTML5, CSS custom properties, ES6+ modules
 - React/Next.js: functional components, TypeScript, proper imports, hooks
-- Python: PEP-8, type hints, docstrings
+- Python: PEP-8, type hints, docstrings, python3 -m pip for packages
 - Node.js: ES modules or CommonJS (match existing style), async/await
 
 ## QUALITY STANDARDS
 - Production-ready: error handling, loading states, responsive design
 - Accessible: ARIA labels, semantic elements, keyboard navigation
 - Clean: consistent naming, no dead code, logical file structure`;
+
+      const systemPrompt = specialisation;
 
 
       const messagesForAI = [
@@ -1333,74 +1455,21 @@ You MUST use <nexios_ops> to create or edit files. Never paste code in chat — 
             </div>
           )}
 
-          {/* DESIGN VIEW */}
+          {/* DESIGN VIEW — Excalidraw vector canvas */}
           {contentTab === 'design' && (
-            <div className="flex-1 flex flex-col overflow-auto p-6 gap-5">
-              <div className="flex flex-col items-center text-center mb-2">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3" style={{ background: 'rgba(244,114,182,0.1)', border: '1px solid rgba(244,114,182,0.2)' }}>
-                  <SiFigma size={22} className="text-pink-400" />
-                </div>
-                <h3 className="text-base font-bold text-white mb-1">Design Canvas</h3>
-                <p className="text-sm text-white/40 max-w-xs">Import a Figma design or describe your UI — the AI generates components directly in your workspace.</p>
-              </div>
-
-              {/* Figma community templates */}
-              <div className="rounded-2xl border p-4" style={{ borderColor: 'rgba(244,114,182,0.2)', background: 'rgba(244,114,182,0.04)' }}>
-                <p className="text-xs font-semibold mb-3" style={{ color: '#f472b6' }}>Figma Community Templates</p>
-                <div className="space-y-2">
-                  {[
-                    { label: 'Material Design 3', url: 'https://www.figma.com/community/file/1035203688168086460', desc: 'Google\'s design system' },
-                    { label: 'Apple iOS 17 UI Kit', url: 'https://www.figma.com/community/file/1247950726448004999', desc: 'Official Apple components' },
-                    { label: 'Tailwind CSS UI Kit', url: 'https://www.figma.com/community/file/768809027799962739', desc: '200+ Tailwind components' },
-                    { label: 'Shadcn/UI Design Kit', url: 'https://www.figma.com/community/file/1203061493325953101', desc: 'Radix-based UI components' },
-                    { label: 'Ant Design System', url: 'https://www.figma.com/community/file/831698976089873405', desc: 'Enterprise UI framework' },
-                    { label: 'Bootstrap 5 UI Kit', url: 'https://www.figma.com/community/file/1042763499833335979', desc: 'Bootstrap components' },
-                  ].map(t => (
-                    <a key={t.url} href={t.url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all group"
-                      style={{ background: 'rgba(0,0,0,0.2)', borderColor: 'rgba(244,114,182,0.1)' }}
-                      onMouseOver={e => (e.currentTarget.style.borderColor = 'rgba(244,114,182,0.3)')}
-                      onMouseOut={e => (e.currentTarget.style.borderColor = 'rgba(244,114,182,0.1)')}>
-                      <SiFigma size={14} className="text-pink-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-white group-hover:text-pink-300 transition-colors">{t.label}</p>
-                        <p className="text-[10px] text-white/40">{t.desc}</p>
-                      </div>
-                      <span className="text-[10px] text-pink-400/60 group-hover:text-pink-400 transition-colors">Open →</span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-3 justify-center">
-                <button className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 text-sm text-white/60 hover:text-white hover:border-white/30 transition-colors" onClick={() => {
-                  const url = prompt('Paste your Figma file URL:');
-                  if (url) {
-                    const content = `# Figma Design Import\n\nSource: ${url}\nImported: ${new Date().toISOString()}\n\nAsk Nexios AI to convert this design to code:\n- "Convert this Figma design to React components"\n- "Generate the full HTML/CSS for this design"\n`;
-                    setFiles(prev => [...prev, createFileNode('figma-import.md', content)]);
-                    setSelectedPath('figma-import.md');
-                    setContentTab('code');
-                  }
-                }}>
-                  <BsGlobe size={13} /> Import Figma URL
-                </button>
-                <button className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-white font-medium transition-colors" style={{ background: '#6366f1' }} onClick={() => setPanelTab('chat')}>
-                  <BsStars size={13} /> Ask AI to design
-                </button>
-              </div>
+            <div className="flex-1 overflow-hidden">
+              <DesignEditor projectId={id} projectName={project?.name} />
             </div>
           )}
 
-          {/* DOCUMENT VIEW */}
+          {/* DOCUMENT VIEW — TipTap rich text (Word-like) */}
           {contentTab === 'document' && (
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="h-7 flex items-center justify-between px-3 border-b shrink-0" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-                <span className="text-[10px] text-white/40">Document Editor</span>
-                <span className="text-[9px] text-white/20">{docContent.split(/\s+/).filter(Boolean).length} words · {docContent.split('\n').length} lines</span>
-              </div>
-              <textarea value={docContent} onChange={e => setDocContent(e.target.value)}
-                placeholder={`Start writing your document here...\n\nMarkdown supported:\n# Heading 1\n## Heading 2\n**Bold** and *italic*\n- Bullet points\n\nAsk AI in chat to draft, edit, or expand your content.`}
-                className="flex-1 p-5 bg-transparent text-[13px] text-white/80 resize-none outline-none leading-relaxed" />
+            <div className="flex-1 overflow-hidden">
+              <DocumentEditor
+                content={docContent}
+                onChange={html => setDocContent(html)}
+                projectName={project?.name}
+              />
             </div>
           )}
         </div>
@@ -1411,7 +1480,7 @@ You MUST use <nexios_ops> to create or edit files. Never paste code in chat — 
             {(['chat', 'terminal'] as PanelTab[]).map(tab => (
               <button key={tab} onClick={() => setPanelTab(tab)}
                 className={`h-8 flex-1 text-[10px] capitalize font-medium border-b-2 transition-colors ${panelTab === tab ? 'border-indigo-500 text-indigo-300' : 'border-transparent text-white/30 hover:text-white/60'}`}>
-                {tab === 'chat' ? '✦ Chat' : 'Terminal'}
+                {tab === 'chat' ? (project?.type === 'document' ? '✦ Nexios Doc' : project?.type === 'design' ? '✦ Nexios Design' : '✦ Nexios AI') : 'Terminal'}
               </button>
             ))}
           </div>

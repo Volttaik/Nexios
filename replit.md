@@ -2,7 +2,7 @@
 
 ## Overview
 
-Nexios AI is a Next.js 15 enterprise AI platform featuring a dark glass design system, user authentication, an AI chat assistant, and a full AI-powered coding workspace (IDE) with Monaco editor, file tree, AI code agent, sandbox terminal, GitHub import, and API search.
+Nexios AI is a Next.js 15 enterprise AI platform featuring a dark glass design system, user authentication, an AI chat assistant, and a full AI-powered coding workspace (IDE) with Monaco editor, TipTap rich-text document editor (Word-like), Excalidraw vector design canvas (CorelDraw-like), AI code agent with project-type specialisation, sandboxed NixOS terminal, GitHub/Figma import, and API search.
 
 ## User Preferences
 
