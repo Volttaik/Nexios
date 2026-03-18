@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import DashboardSidebar, { ChatSession } from '../components/DashboardSidebar';
 import type { AppUser } from '@/app/types/user';
@@ -104,7 +104,8 @@ export default function ChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const currentSession = sessions.find(s => s.id === currentSessionId);
-  const messages = currentSession?.messages || [];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const messages = useMemo(() => currentSession?.messages || [], [currentSessionId, sessions]);
 
   useEffect(() => {
     setMounted(true);
@@ -131,6 +132,7 @@ export default function ChatPage() {
         if (s.length > 0 && !currentSessionId) setCurrentSessionId(s[0].id);
       } catch { /* ignore */ }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => { if (sessions.length > 0) localStorage.setItem('chatSessions', JSON.stringify(sessions)); }, [sessions]);
@@ -292,6 +294,7 @@ export default function ChatPage() {
                     style={{ background: msg.sender === 'user' ? 'var(--bg3)' : providerColor }}>
                     {msg.sender === 'user'
                       ? (profilePic
+                          // eslint-disable-next-line @next/next/no-img-element
                           ? <img src={profilePic} alt="You" className="w-8 h-8 rounded-2xl object-cover" />
                           : <span className="text-xs font-bold" style={{ color: 'var(--text2)' }}>{user?.fullName?.[0]?.toUpperCase() || 'U'}</span>)
                       : <span className="text-white"><BotIcon /></span>
