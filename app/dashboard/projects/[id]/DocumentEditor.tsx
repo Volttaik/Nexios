@@ -72,7 +72,7 @@ export default function DocumentEditor({ content, onChange, projectName }: Docum
   useEffect(() => {
     if (!editor) return;
     if (content !== editor.getHTML()) {
-      editor.commands.setContent(content || '', false);
+      editor.commands.setContent(content || '', { emitUpdate: false });
     }
   }, [content, editor]);
 
