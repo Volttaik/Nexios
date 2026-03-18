@@ -2,7 +2,7 @@
 
 ## Overview
 
-Nexios AI is a Next.js 15 enterprise AI platform featuring a dark glass design system, user authentication, an AI chat assistant, and a full AI-powered coding workspace (IDE) with Monaco editor, TipTap rich-text document editor (Word-like), Excalidraw vector design canvas (CorelDraw-like), AI code agent with project-type specialisation, sandboxed NixOS terminal, GitHub/Figma import, and API search.
+Nexios AI is a Next.js 15 enterprise AI platform featuring a dark glass design system, user authentication, an AI chat assistant, and a full AI-powered coding workspace (IDE) with Monaco editor, TipTap rich-text document editor (Word-like), a custom Tiptap-powered vector design canvas (CorelDRAW-like), AI code agent with project-type specialisation, sandboxed terminal, GitHub/Figma import, and API search.
 
 ## User Preferences
 
@@ -12,12 +12,14 @@ Preferred communication style: Simple, everyday language.
 
 ### Tech Stack
 
-- **Framework**: Next.js 15.5.12 (App Router)
+- **Framework**: Next.js 15.5.13 (App Router)
 - **Styling**: Tailwind CSS v4 + CSS custom properties (dark glass design system)
 - **Database**: MongoDB (via Mongoose)
 - **Auth**: JWT tokens (jsonwebtoken + jose), bcryptjs
 - **Icons**: React Icons (hi/bs)
 - **Code Editor**: @monaco-editor/react (Monaco / VS Code editor)
+- **Document Editor**: Tiptap (ProseMirror) — rich text, Word-like
+- **Design Editor**: Tiptap (ProseMirror) + custom SVG canvas — CorelDRAW-like vector design
 - **Language**: TypeScript
 
 ### Design System
@@ -37,78 +39,126 @@ Dark glass theme defined in `app/globals.css`:
 ```
 app/
   api/
-    login/route.ts         — POST /api/login
-    register/route.ts      — POST /api/register
+    login/route.ts             — POST /api/login
+    register/route.ts          — POST /api/register
+    workspace/[id]/
+      files/route.ts           — CRUD file operations
+      init/route.ts            — Initialize workspace directory
+      run/route.ts             — Smart project runner (Node/Python/HTML/Go)
+      terminal/route.ts        — Shell command execution
   components/
-    Header.tsx             — Public nav header
-    MenuDropdown.tsx       — Navigation dropdown
-    SubdomainHandler.tsx   — Subdomain detection
-    LoadingSpinner.tsx     — Loading spinner
-    ShareableLink.tsx      — Copy auth link
+    Header.tsx                 — Public nav header
+    MenuDropdown.tsx           — Navigation dropdown
+    SubdomainHandler.tsx       — Subdomain detection
+    LoadingSpinner.tsx         — Loading spinner
+    ShareableLink.tsx          — Copy auth link
   dashboard/
-    layout.tsx             — Protected layout (auth check, dark bg)
-    page.tsx               — Dashboard overview with stats & activity
+    layout.tsx                 — Protected layout (auth check, dark bg)
+    page.tsx                   — Dashboard overview with stats & activity
     components/
-      DashboardHeader.tsx  — Fixed top bar with search & user
-      DashboardSidebar.tsx — Dark glass sidebar with Projects link
-      UserDropdown.tsx     — User profile dropdown
-    chat/page.tsx          — AI chat (Gemini-powered)
+      DashboardHeader.tsx      — Fixed top bar with search & user
+      DashboardSidebar.tsx     — Dark glass sidebar with Projects link
+      UserDropdown.tsx         — User profile dropdown
     projects/
-      page.tsx             — Projects list (localStorage, GitHub import)
-      [id]/page.tsx        — Full AI workspace (Monaco + AI + Terminal + API search)
+      page.tsx                 — Projects list (localStorage, GitHub/Figma import)
+      [id]/
+        page.tsx               — Workspace switcher (code/design/document)
+        CodeWorkspace.tsx      — Full AI IDE (Monaco + AI agent + terminal)
+        DesignEditor.tsx       — Vector design canvas (Tiptap + SVG canvas)
+        DocumentEditor.tsx     — Rich text editor (Tiptap)
   lib/
-    mongodb.ts             — Mongoose connection helper
-    tokenUtils.ts          — JWT utilities
+    ai.ts                      — Multi-provider AI abstraction
+    mongodb.ts                 — Mongoose connection helper
+    tokenUtils.ts              — JWT utilities
   models/
-    user.ts                — Mongoose User schema
+    user.ts                    — Mongoose User schema
   types/
-    user.ts                — AppUser interface
-  login/page.tsx           — Dark glass login (icons RIGHT side)
-  register/page.tsx        — Dark glass register (icons RIGHT side)
-  page.tsx                 — Dark glass landing page (hero + features + CTA)
-  layout.tsx               — Root layout
-  globals.css              — Dark glass design system + Tailwind v4
+    user.ts                    — AppUser interface
+  login/page.tsx               — Dark glass login
+  register/page.tsx            — Dark glass register
+  page.tsx                     — Landing page
+  layout.tsx                   — Root layout
+  globals.css                  — Dark glass design system + Tailwind v4
+scripts/
+  setup-env.sh                 — Runtime environment setup (Node/Python/Nix)
+shell.nix                      — Nix development environment definition
 ```
 
-### Project Workspace Features (`/dashboard/projects/[id]`)
+### Editor Architecture
 
-**Unified AI Agent System:**
-The user sees one AI: "Nexios AI". Internally, three background processes work together transparently:
-- **Conversational layer**: handles the natural language response shown in chat
-- **Coding Agent**: parses AI-output `<nexios_ops>` JSON blocks and directly creates, edits, or deletes files in the workspace — no code shown in chat
-- **Coordinator**: extracts structured file operations from the AI response and routes them to the Coding Agent silently
+Both the **Document Editor** and **Design Editor** share the same core editing infrastructure:
+- Both use `useEditor` from `@tiptap/react`
+- Both use `@tiptap/starter-kit` as the base engine (ProseMirror underneath)
+- Both use Tiptap's extension system for additional capabilities
+- **DocumentEditor**: text extensions (Underline, TextAlign, Highlight, Color, FontFamily, Image, Link, Placeholder)
+- **DesignEditor**: `DesignCanvasExtension` (custom extension for shape storage/undo-redo) + SVG canvas rendering
 
-The AI outputs structured `<nexios_ops>[{op, path, content}]</nexios_ops>` blocks alongside text. The ops are stripped from the chat and executed immediately. Files appear in the tree automatically.
+The difference is in the tools exposed and the rendering layer — not the editing engine itself.
 
-**Autonomous Mode** (toggled in Settings):
-- Gives the AI awareness of its own logic and system prompt
-- The AI can reason about its own limitations and propose self-improvements
-- Indicated by a `⚡ AUTONOMOUS` badge in the workspace top bar
+### Smart Run System (`/api/workspace/[id]/run`)
 
-**UI Panels:**
-- **Left sidebar** — File tree, collapsible, create/delete/rename files
-- **Center content** — 4 tabs: Code (Monaco editor), Files list, Design canvas, Document editor
-- **Right panel** — 2 tabs: Chat (single unified AI), Terminal (workspace shell)
-- **Top bar** — Project name, type badge, single Nexios AI status indicator, export, model selector
+The run API intelligently detects project type and runs it correctly:
 
-**Content Modes:**
-- **Code**: Monaco editor with syntax highlighting, 40+ languages
-- **Files**: Visual file browser
-- **Design**: Figma import + AI-generated UI via Agent 1
-- **Document**: Markdown/text editor with AI assistance
+| Detection | Entry Point | Action |
+|-----------|-------------|--------|
+| `package.json` present | `npm start` / `npm run dev` / `node <main>` | Runs Node.js |
+| `main.py`, `app.py`, or `*.py` | `python3 <file>` | Runs Python |
+| `index.html` or `*.html` selected | — | Returns `browser-preview` response |
+| `go.mod` present | `go run .` | Runs Go |
+| `*.sh` file | `bash <file>` | Runs Shell |
 
-**Other Features:**
-- **GitHub Import** — fetches public repo metadata via GitHub REST API
-- **Figma Import** — creates design project from Figma file URL
-- **Export** — downloads project as JSON (files + chat history)
-- **Save** — auto-saves to localStorage on every change
+HTML files **never** execute as shell scripts. The CodeWorkspace renders HTML in an `<iframe>` with a browser-style preview UI when `type: 'browser-preview'` is returned.
 
-### Projects Page (`/dashboard/projects`)
+### NixOS Environment
 
-- **Project types**: Code, Design, Document (visual selection in create modal + filter tabs)
-- **GitHub Import** — imports public repos
-- **Figma Import** — creates design projects from Figma URLs
-- **Type filter** — filter projects by All / Code / Design / Document
+- `shell.nix` — Nix shell definition with Node.js 20, Python 3.11, Go, and tools
+- `scripts/setup-env.sh` — Bootstrap script that verifies/installs Node.js and Python via Nix
+- Runtime PATH includes `/nix/var/nix/profiles/default/bin` for Nix-installed tools
+
+### Design Canvas Features
+
+Vector design environment similar to CorelDRAW, built on Tiptap:
+- **Tools**: Select, Node Edit, Rectangle, Ellipse, Star, Polygon, Line, Arrow, Text, Freehand
+- **SVG Canvas**: Interactive SVG rendering with pointer-based drawing and drag-to-move
+- **Right Panel**: AI assistant, Layers (visibility/lock/delete), Color palette + gradients
+- **Object Properties**: X/Y/W/H coordinates, opacity slider, alignment tools
+- **Export**: SVG and PNG export
+- **Persistence**: Auto-saved to localStorage, synced to Tiptap storage
+- **Undo/Redo**: Via Tiptap editor commands
+
+### Document AI Behavior
+
+The document AI auto-inserts content directly into the editor:
+- No confirmation step required
+- When AI generates text with `---INSERT---` blocks, content is immediately written into the document
+- Chat shows `✓ Inserted N words into your document.`
+
+### Run Button UI
+
+A single clean circular play button (`⏵`) in the CodeWorkspace top bar:
+- Green circle with play triangle icon
+- Spinning indicator while running
+- Tooltip explains auto-detection behavior
+
+### Project Workspace Features
+
+**Code Workspace (`CodeWorkspace.tsx`):**
+- Left sidebar: File tree, collapsible, create/delete/rename files
+- Center: Monaco editor + terminal panel (200px)
+- Right panel: Chat / Activity / Terminal tabs
+- Top bar: Project name, play button, AI status, export, model selector
+- Browser preview: HTML files open in an iframe overlay instead of executing
+
+**Design Workspace (`DesignEditor.tsx`):**
+- Top: Toolbar with all shape tools + fill/stroke color pickers
+- Center: SVG canvas with grid, drawing, and drag-to-move
+- Right panel: AI assistant / Layers / Colors tabs
+- Status bar: Tool, object count, layer count, selected object info
+
+**Document Workspace (`DocumentEditor.tsx`):**
+- Full Word-like ribbon toolbar
+- White page canvas with zoom
+- Right: AI writing assistant (auto-inserts generated content)
 
 ### Environment Variables
 
@@ -116,22 +166,6 @@ The AI outputs structured `<nexios_ops>[{op, path, content}]</nexios_ops>` block
 |----------|-------------|----------|
 | `MONGODB_URI` | MongoDB connection string | Yes (auth endpoints) |
 | `JWT_SECRET` | JWT signing secret | Yes (auto-generated) |
-| `NEXT_PUBLIC_GEMINI_API_KEY` | Google Gemini API key | Yes (AI features) |
-
-### Authentication Flow
-
-1. Register at `/register` → POST `/api/register` → stores hashed password → returns JWT
-2. Login at `/login` → POST `/api/login` → verifies password → returns JWT
-3. JWT stored in `localStorage` + cookie (`auth_token`)
-4. Dashboard `layout.tsx` checks localStorage; redirects to `/login` if absent
-5. Project workspace has its own full-screen layout (no dashboard shell)
-
-### Data Storage
-
-- **Users**: MongoDB (required for auth)
-- **Projects**: `localStorage` (`nexios_projects`)  
-- **Project files**: `localStorage` (`nexios_files_<id>`)
-- No backend required for projects — fully client-side
 
 ### Running the App
 
@@ -140,12 +174,5 @@ The AI outputs structured `<nexios_ops>[{op, path, content}]</nexios_ops>` block
 
 ### GitHub Repository
 
-- URL: `https://github.com/Volttaik/Nexios.git`
-- Push method: GitHub REST API (Replit git safety system blocks direct push)
-
-### Known Notes
-
-- Monaco editor uses `dynamic()` with `ssr: false` to avoid SSR issues
-- `NEXT_PUBLIC_GEMINI_API_KEY` must be set for AI agent features; fails gracefully without it
-- App works without MongoDB; auth endpoints fail gracefully with a clear error
-- `npm audit` reports 0 vulnerabilities (Next.js 15.5.12 security backport)
+- URL: `https://github.com/Volttaik/Nexios`
+- Note: Git push requires the Replit project task system or manual CLI push

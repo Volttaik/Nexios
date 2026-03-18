@@ -8,7 +8,7 @@ import {
   BsFileEarmarkText, BsSearch, BsDownload, BsLightningChargeFill,
   BsCheckCircleFill, BsExclamationCircleFill, BsArrowRepeat,
   BsFileEarmarkPlus, BsPencilFill, BsDashCircleFill, BsTerminalFill,
-  BsPlayFill, BsStopFill,
+  BsPlayFill,
 } from 'react-icons/bs';
 import {
   HiArrowLeft, HiX, HiFolder, HiMenu, HiCode,
@@ -300,6 +300,7 @@ export default function CodeWorkspace({ project }: Props) {
   const [agentPhase, setAgentPhase] = useState<'idle' | 'thinking' | 'coding' | 'done'>('idle');
   const [activityLog, setActivityLog] = useState<ActivityEntry[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [browserPreview, setBrowserPreview] = useState<{ html: string; file: string } | null>(null);
 
   const [messages, setMessages] = useState<ChatMsg[]>([
     { role: 'assistant', content: 'Welcome to your Nexios AI workspace. I can create, edit, and delete files. Tell me what to build!', timestamp: Date.now() }
@@ -476,6 +477,7 @@ export default function CodeWorkspace({ project }: Props) {
 
   const handleRunProject = async () => {
     setIsRunning(true);
+    setBrowserPreview(null);
     setPanelTab('terminal');
     setTermLines(p => [...p, { type: 'info', text: '─── Running project ───' }]);
     addActivity('terminal', 'Running project...');
@@ -488,6 +490,20 @@ export default function CodeWorkspace({ project }: Props) {
       });
       const data = await res.json();
       const runtime = data.runtime || 'Unknown';
+
+      // HTML files open in browser preview — never executed as scripts
+      if (data.type === 'browser-preview') {
+        setBrowserPreview({ html: data.htmlContent, file: data.entryFile });
+        setTermLines(p => [
+          ...p,
+          { type: 'success', text: `[Browser] Opening ${data.entryFile} in preview` },
+          { type: 'output', text: '  Close the preview panel to return to the editor.' },
+        ]);
+        addActivity('info', `Browser preview: ${data.entryFile}`);
+        setIsRunning(false);
+        return;
+      }
+
       setTermLines(p => [
         ...p,
         { type: 'success', text: `[${runtime}] ${data.command || ''}` },
@@ -624,15 +640,22 @@ ${currentFileCtx}`;
         </span>
         <div className="flex-1" />
 
-        {/* Run button */}
+        {/* Run button — single clean play icon */}
         <button
           onClick={handleRunProject}
           disabled={isRunning}
-          className="flex items-center gap-1.5 text-[11px] px-3 py-1 rounded-md font-medium transition-all"
-          style={{ background: isRunning ? 'rgba(52,211,153,0.1)' : '#059669', color: isRunning ? '#34d399' : '#fff' }}
+          title="Run project (auto-detects Node.js, Python, HTML)"
+          className="flex items-center justify-center w-8 h-8 rounded-full transition-all"
+          style={{
+            background: isRunning ? 'rgba(52,211,153,0.12)' : '#059669',
+            color: isRunning ? '#34d399' : '#fff',
+            boxShadow: isRunning ? 'none' : '0 0 0 2px rgba(5,150,105,0.3)',
+          }}
         >
-          {isRunning ? <BsStopFill size={12} /> : <BsPlayFill size={12} />}
-          {isRunning ? 'Running…' : '▶ Run'}
+          {isRunning
+            ? <div className="w-3 h-3 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin" />
+            : <BsPlayFill size={14} style={{ marginLeft: 1 }} />
+          }
         </button>
 
         <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg" style={{ background: 'rgba(255,255,255,0.03)' }}>
@@ -738,8 +761,34 @@ ${currentFileCtx}`;
               </div>
             )}
 
-            <div className="flex-1 overflow-hidden">
-              {selectedPath ? (
+            <div className="flex-1 overflow-hidden relative">
+              {/* Browser preview overlay for HTML files */}
+              {browserPreview ? (
+                <div className="absolute inset-0 flex flex-col" style={{ background: '#fff', zIndex: 10 }}>
+                  <div className="flex items-center gap-2 px-3 py-1.5 shrink-0 border-b" style={{ background: '#0c0f17', borderColor: 'rgba(255,255,255,0.08)' }}>
+                    <div className="flex gap-1">
+                      <div className="w-3 h-3 rounded-full bg-red-500" />
+                      <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                      <div className="w-3 h-3 rounded-full bg-green-500" />
+                    </div>
+                    <div className="flex-1 mx-2 px-2 py-0.5 rounded text-[10px] text-white/40" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                      {browserPreview.file}
+                    </div>
+                    <button
+                      onClick={() => setBrowserPreview(null)}
+                      className="text-[10px] px-2 py-0.5 rounded text-white/40 hover:text-white/80 hover:bg-white/8 transition-colors"
+                    >
+                      ✕ Close
+                    </button>
+                  </div>
+                  <iframe
+                    srcDoc={browserPreview.html}
+                    sandbox="allow-scripts allow-same-origin"
+                    className="flex-1 w-full border-none"
+                    title={browserPreview.file}
+                  />
+                </div>
+              ) : selectedPath ? (
                 <MonacoEditor value={code} language={getLang(selectedPath)} theme="vs-dark" onChange={handleCodeChange}
                   options={{ fontSize: 13, minimap: { enabled: false }, lineNumbers: 'on', padding: { top: 10, bottom: 10 }, scrollBeyondLastLine: false, wordWrap: 'on', smoothScrolling: true }} />
               ) : (

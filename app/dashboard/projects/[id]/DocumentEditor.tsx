@@ -21,7 +21,7 @@ import {
   BsPrinter, BsDownload, BsFileEarmark, BsFileEarmarkText,
   BsPaintBucket, BsHighlighter, BsTextIndentLeft, BsTextIndentRight,
   BsCardText, BsScissors, BsClipboard, BsFiles, BsFonts,
-  BsRobot, BsArrowRepeat, BsPlusCircle,
+  BsRobot, BsArrowRepeat,
 } from 'react-icons/bs';
 import { HiArrowLeft, HiOutlineDocumentText } from 'react-icons/hi';
 import Link2 from 'next/link';
@@ -88,7 +88,6 @@ interface ChatMsg {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
-  insertable?: string;
 }
 
 function ToolBtn({
@@ -331,9 +330,19 @@ Always write in a professional, clear style appropriate for the document context
 
       const response = await callAI(activeProvider.id, activeModel.id, msgsForAI, apiKey);
       const insertable = parseInsertable(response);
-      const display = response.replace(/---INSERT---[\s\S]*?---ENDINSERT---/, insertable ? `✓ Content ready to insert (${insertable.split(' ').length} words)` : '');
 
-      setMessages(p => [...p, { role: 'assistant', content: display, timestamp: Date.now(), insertable }]);
+      // Automatically insert content directly into the document — no confirmation needed
+      if (insertable) {
+        insertAIContent(insertable);
+      }
+
+      const wordCount = insertable ? insertable.trim().split(/\s+/).length : 0;
+      const display = response.replace(
+        /---INSERT---[\s\S]*?---ENDINSERT---/,
+        insertable ? `✓ Inserted ${wordCount} word${wordCount !== 1 ? 's' : ''} into your document.` : ''
+      );
+
+      setMessages(p => [...p, { role: 'assistant', content: display.trim(), timestamp: Date.now() }]);
     } catch (err: any) {
       setMessages(p => [...p, { role: 'assistant', content: `Error: ${err.message}`, timestamp: Date.now() }]);
     } finally {
@@ -580,19 +589,8 @@ Always write in a professional, clear style appropriate for the document context
                   <div className={`w-5 h-5 rounded flex items-center justify-center text-[8px] shrink-0 font-bold mt-0.5 ${msg.role === 'assistant' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-600/40 text-slate-300'}`}>
                     {msg.role === 'assistant' ? 'AI' : 'U'}
                   </div>
-                  <div className="flex flex-col gap-1 max-w-[85%]">
-                    <div className={`rounded-xl px-2.5 py-1.5 text-[11px] leading-relaxed whitespace-pre-wrap break-words ${msg.role === 'assistant' ? 'bg-white/4 text-white/75' : 'bg-indigo-600/20 text-indigo-200'}`}>
-                      {msg.content}
-                    </div>
-                    {msg.insertable && (
-                      <button
-                        onClick={() => insertAIContent(msg.insertable!)}
-                        className="flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-lg self-start transition-all"
-                        style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }}
-                      >
-                        <BsPlusCircle size={10} /> Insert into document
-                      </button>
-                    )}
+                  <div className={`max-w-[85%] rounded-xl px-2.5 py-1.5 text-[11px] leading-relaxed whitespace-pre-wrap break-words ${msg.role === 'assistant' ? 'bg-white/4 text-white/75' : 'bg-indigo-600/20 text-indigo-200'}`}>
+                    {msg.content}
                   </div>
                 </div>
               ))}
