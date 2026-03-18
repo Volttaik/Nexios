@@ -183,16 +183,29 @@ export function AIProvider({ children }: { children: ReactNode }) {
   const [quotaError, setQuotaError] = useState<string | null>(null);
 
   useEffect(() => {
+    const savedKeys: Record<string, string> = (() => {
+      try { return JSON.parse(localStorage.getItem('nexios_api_keys') || '{}'); } catch { return {}; }
+    })();
     const saved = localStorage.getItem('nexios-ai-settings');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setSettings({
-          ...DEFAULT_SETTINGS,
-          ...parsed,
-          providers: { ...DEFAULT_SETTINGS.providers, ...parsed.providers },
+        const mergedProviders = { ...DEFAULT_SETTINGS.providers, ...parsed.providers };
+        Object.keys(savedKeys).forEach(pid => {
+          if (savedKeys[pid] && mergedProviders[pid]) {
+            mergedProviders[pid] = { ...mergedProviders[pid], apiKey: savedKeys[pid] };
+          }
         });
+        setSettings({ ...DEFAULT_SETTINGS, ...parsed, providers: mergedProviders });
       } catch { /* ignore */ }
+    } else if (Object.keys(savedKeys).length > 0) {
+      const providers = { ...DEFAULT_SETTINGS.providers };
+      Object.keys(savedKeys).forEach(pid => {
+        if (savedKeys[pid] && providers[pid]) {
+          providers[pid] = { ...providers[pid], apiKey: savedKeys[pid] };
+        }
+      });
+      setSettings({ ...DEFAULT_SETTINGS, providers });
     }
   }, []);
 
@@ -205,6 +218,13 @@ export function AIProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateProviderConfig = useCallback((providerId: string, config: Partial<AIProviderConfig>) => {
+    if (config.apiKey !== undefined) {
+      try {
+        const keys = JSON.parse(localStorage.getItem('nexios_api_keys') || '{}');
+        keys[providerId] = config.apiKey;
+        localStorage.setItem('nexios_api_keys', JSON.stringify(keys));
+      } catch { /* ignore */ }
+    }
     setSettings(prev => {
       const next = {
         ...prev,

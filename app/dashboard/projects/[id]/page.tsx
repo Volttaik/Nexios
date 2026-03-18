@@ -14,7 +14,7 @@ import {
   HiArrowLeft,
   HiFolder, HiMenu, HiOutlineFolder, HiPaperAirplane, HiX, HiGlobeAlt
 } from 'react-icons/hi';
-import { SiFigma } from 'react-icons/si';
+
 import { useAI } from '@/app/context/AIContext';
 import { callAI } from '@/app/lib/ai';
 

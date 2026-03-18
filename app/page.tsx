@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { HiArrowRight, HiCode, HiGlobe, HiLightningBolt } from 'react-icons/hi';
+import { HiArrowRight, HiCode, HiLightningBolt } from 'react-icons/hi';
 import { BsRobot, BsCpu, BsStars, BsTerminal, BsGithub, BsBrush, BsFileEarmarkRichtext, BsPlayCircle, BsDownload, BsCodeSlash, BsCheck2Circle } from 'react-icons/bs';
 import { SiFigma } from 'react-icons/si';
 
