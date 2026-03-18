@@ -76,6 +76,7 @@ export default function ProfilePage() {
         <div className="flex items-center gap-5">
           <div className="relative cursor-pointer" onClick={() => profileInputRef.current?.click()}>
             {profilePic
+              // eslint-disable-next-line @next/next/no-img-element
               ? <img src={profilePic} alt="Profile" className="w-20 h-20 rounded-2xl object-cover shadow-md" style={{ border: '2px solid var(--border)' }} />
               : <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-md">
                   <span className="text-white text-2xl font-bold">{user.fullName?.[0] || 'U'}</span>
