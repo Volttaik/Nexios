@@ -1,81 +1,156 @@
 import type { TaskCategory, KnowledgeResult, ConversationContext } from '../types/index';
 
-interface ResponseTemplate {
-  prefix?: string;
-  format: 'prose' | 'code' | 'list' | 'mixed';
-  maxKnowledge: number;
+const CONFIDENCE_THRESHOLD = 0.22;
+
+const SCHEMA_HEADER_RE = /^\[SCHEMA:[^\]]*\](\[SRC:[^\]]*\])?(\[CAT:[^\]]*\])?(\[CONF:[^\]]*\])?(\[TS:[^\]]*\])?\s*/;
+
+function cleanContent(raw: string): string {
+  return raw
+    .replace(SCHEMA_HEADER_RE, '')
+    .replace(/\[SCHEMA:[^\]]*\]/g, '')
+    .replace(/\[SRC:[^\]]*\]/g, '')
+    .replace(/\[CAT:[^\]]*\]/g, '')
+    .replace(/\[CONF:[^\]]*\]/g, '')
+    .replace(/\[TS:[^\]]*\]/g, '')
+    .trim();
 }
 
-const TEMPLATES: Record<TaskCategory, ResponseTemplate> = {
-  coding:   { format: 'code',  maxKnowledge: 5 },
-  document: { format: 'prose', maxKnowledge: 4 },
-  design:   { format: 'list',  maxKnowledge: 4 },
-  chat:     { format: 'prose', maxKnowledge: 3 },
-  search:   { format: 'mixed', maxKnowledge: 6 },
-  unknown:  { format: 'prose', maxKnowledge: 3 },
-};
-
-function buildKnowledgeBlock(results: KnowledgeResult[], maxKnowledge: number): string {
-  if (!results.length) return '';
-  const top = results.slice(0, maxKnowledge);
-  return top.map(r => r.entry.content.slice(0, 600)).join('\n\n---\n\n');
+function topContent(results: KnowledgeResult[], max: number): string[] {
+  return results
+    .slice(0, max)
+    .map(r => cleanContent(r.entry.content).slice(0, 700).trim())
+    .filter(c => c.length > 20);
 }
 
-function buildContextBlock(ctx?: ConversationContext): string {
-  if (!ctx || !ctx.history.length) return '';
-  const recent = ctx.history.slice(-6);
-  return recent.map(h => `${h.role === 'user' ? 'User' : 'Nexios AI'}: ${h.content}`).join('\n');
+function prose(chunks: string[]): string {
+  return chunks.join('\n\n');
+}
+
+function detectMath(input: string): number | null {
+  const expr = input
+    .replace(/what(?:'s| is)\s+/i, '')
+    .replace(/calculate\s+/i, '')
+    .replace(/compute\s+/i, '')
+    .replace(/[^0-9+\-*/().%\s]/g, '')
+    .trim();
+
+  if (!expr || expr.length > 60) return null;
+  if (!/\d/.test(expr)) return null;
+
+  try {
+    const result = Function(`"use strict"; return (${expr})`)();
+    if (typeof result === 'number' && isFinite(result)) return result;
+  } catch { /* not evaluable */ }
+  return null;
+}
+
+function greetingResponse(input: string): string | null {
+  const l = input.toLowerCase().trim();
+  if (l.match(/^(hi|hello|hey|howdy|hiya|sup|what'?s up|yo)\b/)) {
+    return "Hello! How can I help you today?";
+  }
+  if (l.match(/\bgood\s*(morning|afternoon|evening|day|night)\b/)) {
+    const part = l.includes('morning') ? 'morning' :
+                 l.includes('afternoon') ? 'afternoon' :
+                 l.includes('evening') ? 'evening' :
+                 l.includes('night') ? 'night' : 'day';
+    return `Good ${part}! How can I assist you?`;
+  }
+  if (l.match(/\b(thank(?:s| you)|cheers|appreciate)\b/)) {
+    return "You're welcome! Is there anything else I can help you with?";
+  }
+  if (l.match(/\b(bye|goodbye|see you|take care|later)\b/)) {
+    return "Goodbye! Feel free to come back any time.";
+  }
+  return null;
+}
+
+function identityResponse(input: string): string | null {
+  const l = input.toLowerCase();
+  if (l.match(/\b(who|what)\s+(are|r)\s+you\b/) || l.match(/\bintroduce yourself\b/)) {
+    return "I am Nexios AI — the built-in intelligence system of the Nexios platform.\n\nI can help you with coding questions, document writing, design advice, maths, science, and general conversation. I learn continuously from public knowledge sources, so the more time I have to train, the better my answers become.";
+  }
+  if (l.match(/\bwhat can you do\b/) || l.match(/\bwhat do you (do|know)\b/)) {
+    return "I can help you with:\n\n- **Coding** — explain code, debug errors, and describe algorithms\n- **Mathematics** — solve and explain maths problems\n- **Science** — biology, physics, chemistry, and general science\n- **Writing** — drafting, editing, and formatting documents\n- **Design** — colour theory, layout, typography, and UX advice\n- **General questions** — facts, definitions, and explanations\n\nMy knowledge grows continuously as I learn from public resources.";
+  }
+  if (l.match(/\bare you (an? )?(ai|artificial intelligence|bot|robot|human|real)\b/)) {
+    return "I am an AI — the Nexios AI system. I am not human, but I am designed to communicate naturally and helpfully. I run entirely on this server and learn from public knowledge sources rather than relying on external APIs.";
+  }
+  return null;
+}
+
+function dateTimeResponse(input: string): string | null {
+  const l = input.toLowerCase();
+  const now = new Date();
+
+  if (l.match(/\b(what(?:'s| is) (?:the )?(?:date|today)|today(?:'s)? date|what day is (it|today))\b/)) {
+    return `Today is ${now.toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`;
+  }
+  if (l.match(/\b(what(?:'s| is) (?:the )?time|current time|time is it)\b/)) {
+    return `The current time is ${now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} (server time).`;
+  }
+  if (l.match(/\b(what(?:'s| is) (?:the )?year|current year|what year)\b/)) {
+    return `The current year is ${now.getFullYear()}.`;
+  }
+  return null;
+}
+
+function mathResponse(input: string): string | null {
+  const result = detectMath(input);
+  if (result === null) return null;
+
+  const expr = input
+    .replace(/what(?:'s| is)\s+/i, '')
+    .replace(/calculate\s+/i, '')
+    .replace(/compute\s+/i, '')
+    .replace(/[^0-9+\-*/().%\s]/g, '')
+    .trim();
+
+  const formatted = Number.isInteger(result) ? result.toString() : result.toFixed(6).replace(/\.?0+$/, '');
+  return `${expr} = **${formatted}**`;
+}
+
+function synthesise(input: string, results: KnowledgeResult[], max: number): string {
+  const chunks = topContent(results, max);
+  if (!chunks.length) return '';
+  return prose(chunks);
 }
 
 function codingResponse(input: string, knowledge: KnowledgeResult[]): string {
-  const kBlock = buildKnowledgeBlock(knowledge, 5);
-
-  if (kBlock) {
-    return `Here is what Nexios AI knows that is relevant to your coding request:\n\n${kBlock}\n\nApplying this to your specific request:\n\n> **"${input}"**\n\nNexios AI is processing this task. As its knowledge base grows through training and Ultra Mode, it will generate complete, working code for this request. Currently it provides the most relevant knowledge entries it has stored.`;
-  }
-
-  return `Nexios AI — Coding Assistant\n\nYou asked: **"${input}"**\n\nNexios AI's coding knowledge is still growing. Use Ultra Mode to begin autonomous learning from programming documentation, tutorials, and public datasets. Once trained, Nexios AI will generate complete code solutions, debug errors, and explain algorithms directly — without any external API.`;
+  const body = synthesise(input, knowledge, 4);
+  if (body) return body;
+  return "I don't know this information as of right now — I am still learning. Try asking me about a specific programming concept, language feature, or algorithm, and I will share what I know.";
 }
 
 function documentResponse(input: string, knowledge: KnowledgeResult[]): string {
-  const kBlock = buildKnowledgeBlock(knowledge, 4);
-
-  if (kBlock) {
-    return `Nexios AI — Document Writing\n\n**Relevant knowledge retrieved:**\n\n${kBlock}\n\n**Responding to your request:** "${input}"\n\nNexios AI will compose a full draft as its language knowledge expands through training. The above knowledge has been retrieved from its internal memory to assist with your document task.`;
-  }
-
-  return `Nexios AI — Document Assistant\n\nYou asked: **"${input}"**\n\nNexios AI is ready to assist with document writing. Activate Ultra Mode to enable continuous learning from documentation, writing guides, and educational resources. Once trained, Nexios AI will draft, edit, summarize, and structure full documents for you.`;
+  const body = synthesise(input, knowledge, 3);
+  if (body) return body;
+  return "I don't know this information as of right now — I am still learning. I will be better at writing and documentation assistance as my knowledge grows.";
 }
 
 function designResponse(input: string, knowledge: KnowledgeResult[]): string {
-  const kBlock = buildKnowledgeBlock(knowledge, 4);
-
-  if (kBlock) {
-    return `Nexios AI — Design Advisor\n\n**Retrieved design knowledge:**\n\n${kBlock}\n\n**Your design request:** "${input}"\n\nNexios AI has provided the most relevant design knowledge from its memory. Its design reasoning will improve as it learns more from design documentation, style guides, and UX resources.`;
-  }
-
-  return `Nexios AI — Design Assistant\n\nYou asked: **"${input}"**\n\nNexios AI will provide colour palettes, layout advice, typography recommendations, and UX guidance once its design knowledge base is populated. Start Ultra Mode to begin autonomous learning from design resources and documentation.`;
+  const body = synthesise(input, knowledge, 3);
+  if (body) return body;
+  return "I don't know this information as of right now — I am still learning. My design knowledge will improve as I learn more from design resources and guidelines.";
 }
 
 function chatResponse(input: string, knowledge: KnowledgeResult[], ctx?: ConversationContext): string {
-  const kBlock = buildKnowledgeBlock(knowledge, 3);
-  const ctxBlock = buildContextBlock(ctx);
+  const greeting = greetingResponse(input);
+  if (greeting) return greeting;
 
-  const lower = input.toLowerCase();
-  if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
-    return `Hello! I am **Nexios AI**, the native intelligence system built into this platform.\n\nI can help you with:\n- **Coding** — generate, debug, and explain code\n- **Documents** — write, draft, and edit content\n- **Design** — colour palettes, layouts, UX advice\n- **General chat** — ask me anything\n\nI learn continuously from public datasets and the internet. The more I learn, the smarter I become. You can activate **Ultra Mode** to begin my autonomous learning right now.`;
-  }
+  const identity = identityResponse(input);
+  if (identity) return identity;
 
-  if (lower.includes('what are you') || lower.includes('who are you')) {
-    return `I am **Nexios AI**, the native built-in AI model of the Nexios platform.\n\nUnlike other AI assistants, I do not rely on external APIs. I run entirely on this server and learn continuously from:\n- Public programming datasets\n- Technical documentation and tutorials\n- Educational web content\n- Conversation and writing examples\n\nI grow smarter over time through my **Ultra Mode** — an autonomous learning engine that runs in the background and continuously expands my knowledge base.`;
-  }
+  const datetime = dateTimeResponse(input);
+  if (datetime) return datetime;
 
-  const parts: string[] = ['Nexios AI — General Response\n'];
-  if (ctxBlock) parts.push(`**Conversation context:**\n${ctxBlock}\n`);
-  if (kBlock) parts.push(`**Relevant knowledge:**\n${kBlock}\n`);
-  parts.push(`**Responding to:** "${input}"\n\nNexios AI is processing your query against its current knowledge base. Activate Ultra Mode to expand my knowledge and improve the quality of my responses.`);
+  const math = mathResponse(input);
+  if (math) return math;
 
-  return parts.join('\n');
+  const body = synthesise(input, knowledge, 3);
+  if (body) return body;
+
+  return "I don't know this information as of right now — I am still learning. As my knowledge base grows, I will be able to answer more questions accurately.";
 }
 
 export class ReasoningEngine {
@@ -89,15 +164,24 @@ export class ReasoningEngine {
 
     let content: string;
     switch (category) {
-      case 'coding':   content = codingResponse(input, knowledge);           break;
-      case 'document': content = documentResponse(input, knowledge);         break;
-      case 'design':   content = designResponse(input, knowledge);           break;
-      default:         content = chatResponse(input, knowledge, context);    break;
+      case 'coding':   content = codingResponse(input, knowledge);          break;
+      case 'document': content = documentResponse(input, knowledge);        break;
+      case 'design':   content = designResponse(input, knowledge);          break;
+      default:         content = chatResponse(input, knowledge, context);   break;
     }
 
-    const confidence = knowledge.length > 0
-      ? Math.min(0.9, 0.3 + knowledge[0]?.score * 0.6)
-      : 0.2;
+    const hasInstantAnswer = (
+      greetingResponse(input) !== null ||
+      identityResponse(input) !== null ||
+      dateTimeResponse(input) !== null ||
+      mathResponse(input) !== null
+    );
+
+    const confidence = hasInstantAnswer
+      ? 1.0
+      : knowledge.length > 0
+        ? Math.min(0.95, 0.35 + (knowledge[0]?.score ?? 0) * 0.6)
+        : 0.15;
 
     const sources = [...new Set(knowledge.slice(0, 5).map(r => r.entry.source))];
 
