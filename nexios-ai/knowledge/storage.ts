@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import type { KnowledgeEntry, KnowledgeQuery, KnowledgeResult, KnowledgeCategory } from '../types/index';
+import { DATA_DIR } from '../utils/paths';
 
-const DATA_DIR = path.join(process.cwd(), 'data', 'nexios-ai');
 const KB_FILE  = path.join(DATA_DIR, 'knowledge-base.json');
 const BAK_FILE = path.join(DATA_DIR, 'knowledge-base.backup.json');
 const ERR_LOG  = path.join(DATA_DIR, 'errors.log');
