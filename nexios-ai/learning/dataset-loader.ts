@@ -1,8 +1,8 @@
 import type { TrainingDataset, KnowledgeCategory } from '../types/index';
 import fs from 'fs';
 import path from 'path';
+import { DATA_DIR } from '../utils/paths';
 
-const DATA_DIR = path.join(process.cwd(), 'data', 'nexios-ai');
 const DATASETS_FILE = path.join(DATA_DIR, 'datasets.json');
 
 function ensureDir() {
