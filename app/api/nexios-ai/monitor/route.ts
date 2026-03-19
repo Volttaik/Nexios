@@ -35,9 +35,9 @@ export async function GET() {
   const lc          = lifecycle.getStatus();
 
   const agentSummary = [
-    { name: 'Seeker',          ...seeker.getStatus() },
-    { name: 'Coding',          ...coding.getStatus() },
-    { name: 'Self-Improving',  ...improve.getStatus() },
+    { ...seeker.getStatus(),  name: 'Seeker' },
+    { ...coding.getStatus(),  name: 'Coding' },
+    { ...improve.getStatus(), name: 'Self-Improving' },
   ].map(a => ({
     name:           a.name,
     state:          a.state,
