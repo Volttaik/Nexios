@@ -35,8 +35,8 @@ export async function GET() {
   const engine = getInferenceEngine();
   const stats = engine.getStats();
   return NextResponse.json({
+    ...stats,
     status: 'operational',
     model: 'nexios-ai-v1',
-    ...stats,
   });
 }

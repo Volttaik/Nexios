@@ -16,8 +16,12 @@ const MODEL_BUILD_DATE = new Date().toISOString().split('T')[0];
 const FALLBACK_RESPONSES: Record<KnowledgeCategory, string> = {
   programming: "I can help with coding! Could you be more specific about what you'd like to know? For example, you can ask about JavaScript, TypeScript, React, Python, algorithms, or any specific programming concept.",
   design: "I'm here to assist with design! You can ask me about UI/UX principles, color theory, typography, responsive design, wireframing, or design systems.",
-  science: "Great science question! For the best answer, try asking more specifically — like about physics, chemistry, biology, mathematics, or a particular concept you're studying.",
+  science: "Great science question! For the best answer, try asking more specifically — like about physics, chemistry, biology, or a particular concept you're studying.",
+  mathematics: "Happy to help with maths! Try asking about algebra, calculus, geometry, statistics, probability, or a specific theorem or equation.",
+  conversation: "I'm Nexios AI, always happy to chat! Ask me anything — programming, design, science, maths, or general knowledge.",
   documentation: "I can help with documentation and writing. Try asking about structuring content, writing guides, API documentation, or technical writing best practices.",
+  web_content: "I can help you understand or discuss web content. Try asking something more specific and I'll do my best to assist.",
+  dataset: "I can help with data-related questions. Ask me about datasets, data processing, analysis approaches, or related programming topics.",
   general: "I'm Nexios AI, ready to help! Ask me about programming, design, science, mathematics, or general knowledge. What would you like to explore?",
 };
 

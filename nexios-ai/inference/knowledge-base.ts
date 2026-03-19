@@ -43,12 +43,12 @@ function detectCategory(tokens: string[]): KnowledgeCategory {
   const mathKeywords = ['math', 'algebra', 'calculus', 'equation', 'derivative', 'integral', 'matrix', 'prime', 'binary', 'probability', 'statistics', 'geometry', 'theorem'];
   const scienceKeywords = ['science', 'physics', 'chemistry', 'biology', 'gravity', 'atom', 'dna', 'evolution', 'photosynthesis', 'light', 'energy', 'molecule', 'cell'];
 
-  const scores: Record<KnowledgeCategory, number> = { programming: 0, design: 0, science: 0, documentation: 0, general: 0 };
+  const scores: Record<KnowledgeCategory, number> = { programming: 0, design: 0, science: 0, documentation: 0, general: 0, conversation: 0, mathematics: 0, web_content: 0, dataset: 0 };
 
   for (const token of tokens) {
     if (codingKeywords.includes(token)) scores.programming += 2;
     if (designKeywords.includes(token)) scores.design += 2;
-    if (mathKeywords.includes(token)) scores.science += 1.5;
+    if (mathKeywords.includes(token)) scores.mathematics += 1.5;
     if (scienceKeywords.includes(token)) scores.science += 2;
   }
 
