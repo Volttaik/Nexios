@@ -117,8 +117,8 @@ export class SeekerAgent {
   }
 }
 
-let instance: SeekerAgent | null = null;
+const _g = globalThis as typeof globalThis & { __nexiosSeeker?: SeekerAgent };
 export function getSeekerAgent(): SeekerAgent {
-  if (!instance) instance = new SeekerAgent();
-  return instance;
+  if (!_g.__nexiosSeeker) _g.__nexiosSeeker = new SeekerAgent();
+  return _g.__nexiosSeeker;
 }

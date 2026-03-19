@@ -143,8 +143,8 @@ export class SelfImprovingAgent {
   }
 }
 
-let instance: SelfImprovingAgent | null = null;
+const _g = globalThis as typeof globalThis & { __nexiosSelfImproving?: SelfImprovingAgent };
 export function getSelfImprovingAgent(): SelfImprovingAgent {
-  if (!instance) instance = new SelfImprovingAgent();
-  return instance;
+  if (!_g.__nexiosSelfImproving) _g.__nexiosSelfImproving = new SelfImprovingAgent();
+  return _g.__nexiosSelfImproving;
 }

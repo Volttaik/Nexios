@@ -90,8 +90,8 @@ class LifecycleManager {
   }
 }
 
-let instance: LifecycleManager | null = null;
+const _g = globalThis as typeof globalThis & { __nexiosLifecycle?: LifecycleManager };
 export function getLifecycle(): LifecycleManager {
-  if (!instance) instance = new LifecycleManager();
-  return instance;
+  if (!_g.__nexiosLifecycle) _g.__nexiosLifecycle = new LifecycleManager();
+  return _g.__nexiosLifecycle;
 }

@@ -111,8 +111,8 @@ export class CodingAgent {
   }
 }
 
-let instance: CodingAgent | null = null;
+const _g = globalThis as typeof globalThis & { __nexiosCoding?: CodingAgent };
 export function getCodingAgent(): CodingAgent {
-  if (!instance) instance = new CodingAgent();
-  return instance;
+  if (!_g.__nexiosCoding) _g.__nexiosCoding = new CodingAgent();
+  return _g.__nexiosCoding;
 }

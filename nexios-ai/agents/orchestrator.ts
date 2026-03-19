@@ -133,8 +133,8 @@ class AgentOrchestrator {
   }
 }
 
-let instance: AgentOrchestrator | null = null;
+const _g = globalThis as typeof globalThis & { __nexiosOrchestrator?: AgentOrchestrator };
 export function getOrchestrator(): AgentOrchestrator {
-  if (!instance) instance = new AgentOrchestrator();
-  return instance;
+  if (!_g.__nexiosOrchestrator) _g.__nexiosOrchestrator = new AgentOrchestrator();
+  return _g.__nexiosOrchestrator;
 }
