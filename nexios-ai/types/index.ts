@@ -15,7 +15,11 @@ export type KnowledgeCategory =
   | 'mathematics'
   | 'general'
   | 'web_content'
-  | 'dataset';
+  | 'dataset'
+  | 'history'
+  | 'geography'
+  | 'health'
+  | 'finance';
 
 export interface KnowledgeEntry {
   id: string;
@@ -129,8 +133,6 @@ export interface SecurityContext {
   approved: boolean;
 }
 
-/* ─── Lifecycle ─────────────────────────────────────────────────────────── */
-
 export type LifecycleState = 'idle' | 'starting' | 'running' | 'paused';
 
 export interface LifecycleStatus {
@@ -140,8 +142,6 @@ export interface LifecycleStatus {
   pausedAt: number | null;
   stateChangedAt: number;
 }
-
-/* ─── Agents ─────────────────────────────────────────────────────────────── */
 
 export type AgentName = 'seeker' | 'coding' | 'self-improving';
 export type AgentState = 'idle' | 'running' | 'completed' | 'error';

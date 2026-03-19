@@ -101,6 +101,10 @@ export function categoriseContent(text: string): KnowledgeCategory {
     science:       0,
     web_content:   1,
     dataset:       0,
+    history:       0,
+    geography:     0,
+    health:        0,
+    finance:       0,
   };
 
   const top = (Object.entries(scores) as [KnowledgeCategory, number][])
