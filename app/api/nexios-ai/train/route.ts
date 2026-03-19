@@ -5,8 +5,7 @@ import { getDatasets } from '../../../../nexios-ai/learning/dataset-loader';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const { mode } = body as { mode?: string };
+    await req.json().catch(() => ({}));
 
     const trainer = getTrainer();
     if (trainer.isRunning()) {

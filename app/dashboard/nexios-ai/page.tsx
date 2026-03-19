@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   BsDatabase, BsChatDotsFill, BsCpu, BsLightning,
-  BsCircleFill, BsCodeSlash, BsBrush, BsBook, BsCalculator,
+  BsCircleFill, BsCodeSlash, BsBrush, BsCalculator,
   BsFlask, BsArrowRight, BsCheck2Circle, BsShieldCheck,
 } from 'react-icons/bs';
 import { HiSparkles, HiChip } from 'react-icons/hi';
@@ -79,7 +79,6 @@ export default function NexiosAIPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'architecture'>('chat');
   const chatRef = useRef<HTMLDivElement>(null);
 
   const fetchStatus = useCallback(async () => {
