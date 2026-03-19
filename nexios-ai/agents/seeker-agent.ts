@@ -1,6 +1,7 @@
 import type { AgentStatus } from '../types/index';
-import { crawlBatch } from '../acquisition/crawler';
+import { crawlBatch, crawlSpecificUrls } from '../acquisition/crawler';
 import { fetchDataset, getDatasetCount } from '../datasets/fetcher';
+import { getStructuredLearner } from '../learning/structured-learner';
 
 const CRAWL_PAGES_PER_CYCLE = 4;
 const LOG_LIMIT = 100;
@@ -57,15 +58,25 @@ export class SeekerAgent {
 
     let gathered = 0;
 
-    /* ── Phase 1: Web crawl ─────────────────────────────────────────── */
+    /* ── Phase 1: Web crawl (guided by current learning section) ───── */
     try {
       this.status.currentTask = 'Web crawling knowledge sources';
-      this.log('Phase 1: crawling web sources…');
+      const learner = getStructuredLearner();
+      const sectionUrls = learner.getSectionCrawlUrls();
+      const currentSection = learner.getCurrentSection();
+
+      if (currentSection) {
+        this.log(`Phase 1: crawling for section "${currentSection.name}"…`);
+      } else {
+        this.log('Phase 1: crawling general knowledge sources…');
+      }
 
       let pages = null;
       for (let attempt = 1; attempt <= FETCH_RETRY; attempt++) {
         try {
-          pages = await crawlBatch(CRAWL_PAGES_PER_CYCLE);
+          pages = sectionUrls.length > 0
+            ? await crawlSpecificUrls(sectionUrls, CRAWL_PAGES_PER_CYCLE)
+            : await crawlBatch(CRAWL_PAGES_PER_CYCLE);
           break;
         } catch (e) {
           if (attempt < FETCH_RETRY) {
