@@ -34,15 +34,22 @@ export async function callAI(
 }
 
 async function callNexiosAI(model: string, messages: ChatMessage[], sessionId?: string): Promise<string> {
+  void sessionId;
   try {
-    const lastMsg = messages[messages.length - 1];
-    const message = lastMsg?.content?.trim();
-    if (!message) return 'Please enter a message.';
+    // Send full conversation history for context
+    const formattedMessages = messages.map(m => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content,
+    }));
+
+    if (formattedMessages.length === 0 || !formattedMessages[formattedMessages.length - 1]?.content?.trim()) {
+      return 'Please enter a message.';
+    }
 
     const res = await fetch('/api/nexios-ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, sessionId: sessionId ?? 'default', model }),
+      body: JSON.stringify({ messages: formattedMessages, model }),
     });
 
     if (!res.ok) {
@@ -51,14 +58,13 @@ async function callNexiosAI(model: string, messages: ChatMessage[], sessionId?: 
     }
 
     const data = await res.json();
-    const meta = model === 'nexios-ultra'
-      ? `\n\n---\n*Nexios AI · Ultra Mode · ${data.knowledgeEntriesUsed} knowledge entries used · ${data.processingMs}ms*`
-      : `\n\n---\n*Nexios AI · ${data.knowledgeEntriesUsed} knowledge entries used · ${data.processingMs}ms*`;
+    const modelLabel = model.replace('nexios-', '').replace(/^\w/, c => c.toUpperCase());
+    const meta = `\n\n---\n*Nexios AI · ${modelLabel} · ${data.processingMs}ms*`;
 
     return (data.content || 'No response.') + meta;
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    return `⚠️ **Nexios AI error:** ${msg}\n\nMake sure the Nexios AI system is initialised. Try running training first via the AI panel.`;
+    return `⚠️ **Nexios AI error:** ${msg}\n\nThe Nexios AI backend may be starting up. Try again in a moment.`;
   }
 }
 
