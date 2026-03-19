@@ -88,7 +88,7 @@ export default function DashboardHeader({ toggleSidebar, isSidebarOpen, user, on
         {/* AI Status */}
         <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium" style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)', color: '#34d399' }}>
           <div className="w-1.5 h-1.5 rounded-full bg-[#34d399] animate-pulse" />
-          AI Ready
+          AI Operational
         </div>
 
         <UserDropdown user={user} onLogout={onLogout} />

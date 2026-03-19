@@ -2,7 +2,7 @@
 
 ## Overview
 
-Nexios AI is a Next.js 15 enterprise AI platform featuring a dark glass design system, user authentication, an AI chat assistant, and a full AI-powered coding workspace (IDE) with Monaco editor, TipTap rich-text document editor (Word-like), a custom Tiptap-powered vector design canvas (CorelDRAW-like), AI code agent with project-type specialisation, sandboxed terminal, GitHub/Figma import, and API search.
+Nexios AI is a Next.js 15 full-stack AI-powered development platform that combines a Code IDE (Monaco), Design Canvas (Excalidraw), and Document Editor (TipTap). It features a dark glass design system, JWT authentication, a deployment-trained AI assistant (Nexios AI), project workspaces, a sandbox runner, and GitHub/Figma import.
 
 ## User Preferences
 
@@ -13,280 +13,191 @@ Preferred communication style: Simple, everyday language.
 ### Tech Stack
 
 - **Framework**: Next.js 15.5.13 (App Router)
-- **Styling**: Tailwind CSS v4 + CSS custom properties (dark glass design system)
+- **Styling**: Tailwind CSS v4 + CSS custom properties (dual light/dark design system)
 - **Database**: MongoDB (via Mongoose)
 - **Auth**: JWT tokens (jsonwebtoken + jose), bcryptjs
 - **Icons**: React Icons (hi/bs)
 - **Code Editor**: @monaco-editor/react (Monaco / VS Code editor)
 - **Document Editor**: Tiptap (ProseMirror) — rich text, Word-like
-- **Design Editor**: Tiptap (ProseMirror) + custom SVG canvas — CorelDRAW-like vector design
+- **Design Editor**: Excalidraw — infinite vector canvas
+- **AI Training**: @tensorflow/tfjs-node + natural (deployment-time only)
 - **Language**: TypeScript
 
 ### Design System
 
-Dark glass theme defined in `app/globals.css`:
-- `--bg-primary: #080c14` — page background
-- `--accent: #818cf8` — indigo accent, glows/buttons
-- `--glass-border` — semi-transparent borders
-- `.glass` — glass card utility (backdrop-blur, semi-transparent bg)
-- `.btn-primary`, `.btn-ghost` — button utilities
-- `.input-base` — dark input with focus glow
-- Icons always placed on the **RIGHT** side of input fields
-- Animations: fadeIn, slideUp, scaleIn, glow, float
+Dual light/dark theme defined in `app/globals.css`:
+
+**Dark mode (default for landing/AI pages):**
+- `--bg-primary: #080c14`
+- `--accent: #818cf8`
+
+**Light mode (toggled via ThemeContext):**
+- `--bg-primary: #f0f2f8`
+- `--text-primary: #0f1629`
+- `--accent: #5a5fcf`
+
+**Utilities:** `.glass`, `.btn-primary`, `.btn-ghost`, `.input-base`, `.hover-lift`, `.card-glow`
+**Animations:** `fadeIn`, `slideUp`, `scaleIn`, `pageIn`, `msgIn`, `orbFloat`, `glow`, `float`, `blink`, `shimmer`
 
 ### Project Structure
 
 ```
 app/
   api/
-    login/route.ts             — POST /api/login
-    register/route.ts          — POST /api/register
+    login/route.ts               — POST /api/login
+    register/route.ts            — POST /api/register
+    nexios-ai/
+      chat/route.ts              — POST /api/nexios-ai/chat (inference only, always ready)
+      status/route.ts            — GET /api/nexios-ai/status (model metrics)
     workspace/[id]/
-      files/route.ts           — CRUD file operations
-      init/route.ts            — Initialize workspace directory
-      run/route.ts             — Smart project runner (Node/Python/HTML/Go)
-      terminal/route.ts        — Shell command execution
+      files/route.ts             — CRUD file operations
+      init/route.ts              — Initialize workspace directory
+      run/route.ts               — Smart project runner (Node/Python/HTML/Go)
+      terminal/route.ts          — Shell command execution
   components/
-    Header.tsx                 — Public nav header
-    MenuDropdown.tsx           — Navigation dropdown
-    SubdomainHandler.tsx       — Subdomain detection
-    LoadingSpinner.tsx         — Loading spinner
-    ShareableLink.tsx          — Copy auth link
+    Header.tsx                   — Public nav header
+    MenuDropdown.tsx             — Navigation dropdown
+    SubdomainHandler.tsx         — Subdomain detection
+    LoadingSpinner.tsx           — Loading spinner
+    ShareableLink.tsx            — Copy auth link
+  context/
+    ThemeContext.tsx             — Light/dark mode toggle
   dashboard/
-    layout.tsx                 — Protected layout (auth check, dark bg)
-    page.tsx                   — Dashboard overview with stats & activity
+    layout.tsx                   — Protected layout (auth check)
+    page.tsx                     — Dashboard overview with stats & activity
     components/
-      DashboardHeader.tsx      — Fixed top bar with search & user
-      DashboardSidebar.tsx     — Dark glass sidebar with Projects link
-      UserDropdown.tsx         — User profile dropdown
+      DashboardHeader.tsx        — Fixed top bar with search, theme toggle, AI status
+      DashboardSidebar.tsx       — Sidebar with navigation links
+      UserDropdown.tsx           — User profile dropdown
     projects/
-      page.tsx                 — Projects list (localStorage, GitHub/Figma import)
+      page.tsx                   — Projects list (localStorage, GitHub/Figma import)
       [id]/
-        page.tsx               — Workspace switcher (code/design/document)
-        CodeWorkspace.tsx      — Full AI IDE (Monaco + AI agent + terminal)
-        DesignEditor.tsx       — Vector design canvas (Tiptap + SVG canvas)
-        DocumentEditor.tsx     — Rich text editor (Tiptap)
+        page.tsx                 — Workspace switcher (code/design/document)
+        CodeWorkspace.tsx        — Full AI IDE (Monaco + AI agent + terminal)
+        DesignEditor.tsx         — Excalidraw vector design canvas
+        DocumentEditor.tsx       — Rich text editor (Tiptap)
+    nexios-ai/
+      page.tsx                   — AI dashboard: always-active chat, model metrics, pipeline diagram
   lib/
-    ai.ts                      — Multi-provider AI abstraction
-    mongodb.ts                 — Mongoose connection helper
-    tokenUtils.ts              — JWT utilities
+    ai.ts                        — Multi-provider AI abstraction (Gemini)
+    mongodb.ts                   — Mongoose connection helper
+    tokenUtils.ts                — JWT utilities
   models/
-    user.ts                    — Mongoose User schema
+    user.ts                      — Mongoose User schema
   types/
-    user.ts                    — AppUser interface
-  login/page.tsx               — Dark glass login
-  register/page.tsx            — Dark glass register
-  page.tsx                     — Landing page
-  layout.tsx                   — Root layout
-  globals.css                  — Dark glass design system + Tailwind v4
+    user.ts                      — AppUser interface
+  login/page.tsx                 — Login page
+  register/page.tsx              — Register page
+  page.tsx                       — Landing page (animated hero, scroll animations)
+  layout.tsx                     — Root layout
+  globals.css                    — Dual-mode design system + animations + Tailwind v4
+nexios-ai/
+  inference/
+    engine.ts                    — NexiosInferenceEngine singleton (always ready)
+    knowledge-base.ts            — Cosine-similarity knowledge retrieval
+    response-generator.ts        — Response construction + model info
+  training/
+    datasets.mjs                 — Curated Q&A datasets (5 curriculum areas)
+    validator.mjs                — Post-training benchmark validation
+  types/
+    index.ts                     — Shared TypeScript types
 scripts/
-  setup-env.sh                 — Runtime environment setup (Node/Python/Nix)
-shell.nix                      — Nix development environment definition
+  train.mjs                      — Full TF.js deployment-time training pipeline
+  setup-env.sh                   — Runtime environment setup
+shell.nix                        — Nix development environment
 ```
+
+### Nexios AI Architecture
+
+The Nexios AI system uses a **deployment-time training** model. Training happens ONCE during `npm run build`, not at runtime.
+
+#### Training Pipeline (`scripts/train.mjs`)
+
+Runs via `node scripts/train.mjs && next build`:
+
+1. **Load Datasets** — Curated Q&A pairs from `nexios-ai/training/datasets.mjs`
+2. **Process & Tokenise** — Text normalisation and tokenisation via `natural`
+3. **Train Model** — TensorFlow.js training with multiple passes
+4. **Validate** — Benchmark tests across all curriculum categories (blocks deploy if pass rate < 50%)
+5. **Export** — Model weights saved to `nexios-ai/trained-model/`
+
+#### Inference Engine (`nexios-ai/inference/engine.ts`)
+
+- Singleton `NexiosInferenceEngine` — initialised once on first request
+- Uses cosine similarity against embedded training data
+- Always operational — no lifecycle manager, no "Start AI" required
+- Returns: `content`, `category`, `confidence`, `processingMs`, `modelVersion`
+
+#### Curriculum Categories
+
+| Category | Topics |
+|----------|--------|
+| `general` | Greetings, platform info, general chat |
+| `programming` | JS, TS, React, Node, Git, algorithms |
+| `design` | UI/UX, typography, color theory, design systems |
+| `mathematics` | Calculus, probability, matrices, number theory |
+| `science` | Physics, biology, chemistry, earth science |
+
+#### Chat API (`/api/nexios-ai/chat`)
+
+- `POST` — Always available, no lifecycle check needed
+- Body: `{ message: string }`
+- Response: `{ content, category, confidence, processingMs, modelVersion, status: "operational" }`
+
+#### Status API (`/api/nexios-ai/status`)
+
+- `GET` — Returns model version, build date, architecture, performance metrics
+- Response: `{ status, model: { version, buildDate, architecture, trainingPhases }, performance: { requestCount, avgResponseMs, uptimeMs, knowledgeEntries }, ready }`
+
+### Nexios AI Dashboard (`app/dashboard/nexios-ai/page.tsx`)
+
+Completely redesigned — no Start AI / Stop AI / Learning Toggle buttons:
+
+- **Metrics row**: Model version, avg response time, knowledge entries, request count
+- **Training phases strip**: All 5 curriculum phases shown as validated badges
+- **Always-active chat**: Chat panel works immediately — no activation required
+- **Model info card**: Version, architecture, build date, validation status
+- **Capabilities card**: 5 domain icons with descriptions
+- **Pipeline diagram**: Build-time training stages (Load → Process → Train → Validate → Deploy)
+
+### Landing Page (`app/page.tsx`)
+
+Enhanced with animations:
+- Floating gradient orb background (animated)
+- Scroll-triggered section reveals (`AnimatedSection` component)
+- Staggered hero element animations (badge → h1 → subtitle → CTAs → stats)
+- Hover lift + glow effects on feature cards
+- Mode selector tabs with active glow
+- CTA star icon with float animation
 
 ### Editor Architecture
 
-Both the **Document Editor** and **Design Editor** share the same core editing infrastructure:
-- Both use `useEditor` from `@tiptap/react`
-- Both use `@tiptap/starter-kit` as the base engine (ProseMirror underneath)
-- Both use Tiptap's extension system for additional capabilities
-- **DocumentEditor**: text extensions (Underline, TextAlign, Highlight, Color, FontFamily, Image, Link, Placeholder)
-- **DesignEditor**: `DesignCanvasExtension` (custom extension for shape storage/undo-redo) + SVG canvas rendering
+**Document Editor**: Tiptap with Underline, TextAlign, Highlight, Color, FontFamily, Image, Link, Placeholder extensions — Word-like ribbon toolbar, white page canvas.
 
-The difference is in the tools exposed and the rendering layer — not the editing engine itself.
+**Design Editor**: Excalidraw — infinite vector canvas, all drawing tools, layers, AI design assistant sidebar.
 
-### Docker-Inspired Sandbox System (`lib/sandbox/`)
+**Code Editor**: Monaco with file tree, terminal panel, AI agent, GitHub import, ZIP export, run/preview button.
 
-The execution system is architected like Docker but runs on the available Nix runtimes:
-
-**Files:**
-- `lib/sandbox/types.ts` — TypeScript interfaces (ExecutionPlan, ContainerInstance, SandboxEvent, ExecResult)
-- `lib/sandbox/RuntimeRegistry.ts` — Auto-discovers binary paths (node, npm, python3, pip3, go, bash) via `which`
-- `lib/sandbox/SmartRunner.ts` — Project type detection → ExecutionPlan (image, setupCommands, runCommand)
-- `lib/sandbox/SandboxManager.ts` — Process-based "container" management with SSE streaming, timeouts, cleanup
-- `lib/sandbox/dockerfiles/nodejs.Dockerfile` — Node.js 20 image definition
-- `lib/sandbox/dockerfiles/python.Dockerfile` — Python 3.11 image definition
-- `lib/sandbox/dockerfiles/static.Dockerfile` — Static web server image definition
-
-**Container Images (virtual):**
+### Docker-Inspired Sandbox System
 
 | Image | Runtime | Description |
 |-------|---------|-------------|
-| `nexios/nodejs:20` | Node.js v20.20.0 | Node.js, npm 10, full npm ecosystem |
-| `nexios/python:3.11` | Python 3.11.13 | Python 3.11, pip 25, venv isolation |
+| `nexios/nodejs:20` | Node.js v20 | Node.js, npm, full ecosystem |
+| `nexios/python:3.11` | Python 3.11 | Python, pip, venv isolation |
 | `nexios/go:1.24` | Go 1.24 | Go compiler and tools |
-| `nexios/static:serve` | Browser | Static HTML — no execution, iframe preview |
+| `nexios/static:serve` | Browser | HTML iframe preview |
 | `nexios/shell:bash` | Bash | Generic shell commands |
-
-**Container Lifecycle:**
-1. SmartRunner analyzes project files → produces ExecutionPlan
-2. SandboxManager "pulls" the appropriate image (log message)
-3. SandboxManager "mounts" workspace directory as `/workspace` volume
-4. Setup commands run (`npm install`, `python3 -m venv .venv`, `pip install`)
-5. Main command spawns with SSE streaming of stdout/stderr
-6. Container auto-stops on exit or timeout
-7. Container ID tracked in in-memory registry
-
-**Python Dependency Management:**
-When `requirements.txt` is detected, the sandbox creates a `.venv` virtual environment inside the workspace and installs packages with `pip`. The venv is reused on subsequent runs. This avoids the Nix immutable store restriction.
-
-**Real-time Streaming:**
-The `/api/workspace/[id]/run` POST endpoint returns `text/event-stream` (SSE) instead of JSON. Each event is a JSON object with `type`, `text`, and `timestamp`:
-- `info` — Container lifecycle messages
-- `setup` — Setup command output
-- `stdout` — Process standard output
-- `stderr` — Process standard error
-- `exit` — Container exit with code
-
-The frontend reads the stream via `fetch()` + `ReadableStream.getReader()` and appends each event to the terminal in real time.
-
-### Smart Run System (`/api/workspace/[id]/run`)
-
-The run API intelligently detects project type and runs it correctly:
-
-| Detection | Entry Point | Action |
-|-----------|-------------|--------|
-| `package.json` present | `npm start` / `npm run dev` / `node <main>` | Runs Node.js |
-| `main.py`, `app.py`, or `*.py` | `python3 <file>` | Runs Python |
-| `index.html` or `*.html` selected | — | Returns `browser-preview` response |
-| `go.mod` present | `go run .` | Runs Go |
-| `*.sh` file | `bash <file>` | Runs Shell |
-
-HTML files **never** execute as shell scripts. The CodeWorkspace renders HTML in an `<iframe>` with a browser-style preview UI when `type: 'browser-preview'` is returned.
-
-### NixOS Environment
-
-- `shell.nix` — Nix shell definition with Node.js 20, Python 3.11, Go, and tools
-- `scripts/setup-env.sh` — Bootstrap script that verifies/installs Node.js and Python via Nix
-- Runtime PATH includes `/nix/var/nix/profiles/default/bin` for Nix-installed tools
-
-### Design Canvas Features
-
-Vector design environment similar to CorelDRAW, built on Tiptap:
-- **Tools**: Select, Node Edit, Rectangle, Ellipse, Star, Polygon, Line, Arrow, Text, Freehand
-- **SVG Canvas**: Interactive SVG rendering with pointer-based drawing and drag-to-move
-- **Right Panel**: AI assistant, Layers (visibility/lock/delete), Color palette + gradients
-- **Object Properties**: X/Y/W/H coordinates, opacity slider, alignment tools
-- **Export**: SVG and PNG export
-- **Persistence**: Auto-saved to localStorage, synced to Tiptap storage
-- **Undo/Redo**: Via Tiptap editor commands
-
-### Document AI Behavior
-
-The document AI auto-inserts content directly into the editor:
-- No confirmation step required
-- When AI generates text with `---INSERT---` blocks, content is immediately written into the document
-- Chat shows `✓ Inserted N words into your document.`
-
-### Run Button UI
-
-A single clean circular play button (`⏵`) in the CodeWorkspace top bar:
-- Green circle with play triangle icon
-- Spinning indicator while running
-- Tooltip explains auto-detection behavior
-
-### Project Workspace Features
-
-**Code Workspace (`CodeWorkspace.tsx`):**
-- Left sidebar: File tree, collapsible, create/delete/rename files
-- Center: Monaco editor + terminal panel (200px)
-- Right panel: Chat / Activity / Terminal tabs
-- Top bar: Project name, play button, AI status, export, model selector
-- Browser preview: HTML files open in an iframe overlay instead of executing
-
-**Design Workspace (`DesignEditor.tsx`):**
-- Top: Toolbar with all shape tools + fill/stroke color pickers
-- Center: SVG canvas with grid, drawing, and drag-to-move
-- Right panel: AI assistant / Layers / Colors tabs
-- Status bar: Tool, object count, layer count, selected object info
-
-**Document Workspace (`DocumentEditor.tsx`):**
-- Full Word-like ribbon toolbar
-- White page canvas with zoom
-- Right: AI writing assistant (auto-inserts generated content)
-
-### Nexios AI Autonomous System
-
-A fully autonomous, self-improving AI engine built into the platform under `nexios-ai/`.
-
-#### Lifecycle States (`nexios-ai/lifecycle/manager.ts`)
-- **Idle** → default; no agents active, no responses generated
-- **Starting** → 1.2s warm-up boot sequence
-- **Running** → all agents active, AI responds to prompts
-- **Paused Learning** → agents stopped, AI still responds using existing knowledge
-
-**API:** `POST /api/nexios-ai/lifecycle` with `{ action: "start" | "stop" | "toggleLearning" }`
-
-#### Autonomous Background Agents (`nexios-ai/agents/`)
-| Agent | File | Role | Interval |
-|-------|------|------|----------|
-| **Seeker** | `seeker-agent.ts` | Crawls web + fetches 35 structured datasets | Every 3 min |
-| **Coding** | `coding-agent.ts` | Encodes/deduplicates/stores knowledge to DB | Every 2 min |
-| **Self-Improving** | `self-improving-agent.ts` | Deduplicates, merges, optimises retrieval | Every 8 min |
-| **Orchestrator** | `orchestrator.ts` | Coordinates agents in the continuous loop | 10s poll tick |
-
-#### Dataset Sources (`nexios-ai/datasets/fetcher.ts`)
-35 free dataset sources including:
-- Wikipedia REST API (JavaScript, Python, ML, AI, NLP, algorithms, etc.)
-- MDN Web Docs (JS Guide, CSS Grid, Fetch API, Web APIs)
-- GitHub READMEs (Next.js, React, Tailwind CSS)
-- Wikipedia search queries for frameworks, databases, accessibility
-
-#### Knowledge Base (`nexios-ai/knowledge/storage.ts`)
-- Persistent JSON storage at `data/nexios-ai/knowledge-base.json`
-- Auto-saves with 2s debounce
-- SHA-256 deduplication via Coding Agent
-- Keyword extraction + confidence-weighted scoring for fast retrieval
-
-#### API Routes
-| Route | Method | Purpose |
-|-------|--------|---------|
-| `/api/nexios-ai/lifecycle` | GET/POST | Lifecycle state + controls |
-| `/api/nexios-ai/agents` | GET | Agent status + orchestrator stats |
-| `/api/nexios-ai/knowledge` | GET | KB stats, category counts, search |
-| `/api/nexios-ai/chat` | POST | Chat (only works when AI is Running/Paused) |
-| `/api/nexios-ai/status` | GET | v0.2.0 full status: lifecycle, storage, orchestrator |
-| `/api/nexios-ai/test` | POST | Diagnostic: full/quick pipeline test (all agents) |
-| `/api/nexios-ai/monitor` | GET | Health, storage stats, recent errors, checkpoints |
-
-#### Knowledge Storage Features (`nexios-ai/knowledge/storage.ts`)
-- Persistent JSON at `data/nexios-ai/knowledge-base.json`; auto-saves with 2s debounce
-- Hard cap: 100,000 entries; warns at 85% usage; `isFull()` blocks new writes
-- `remove()`, `removeMany()`, `update()`, `backup()`/`restoreBackup()` methods
-- All errors logged to `data/nexios-ai/errors.log`
-- Checkpoint system (max 50 checkpoints) saved to `data/nexios-ai/checkpoints.json`
-
-#### Agent Capabilities
-- **Seeker**: Retry logic, 500-item queue cap, phase-independent error isolation
-- **Coding**: Retry up to 3×, versioned encoding schema v1.2, batch processing, `warmUp()`, checkpoint every 5 cycles
-- **Self-Improving**: SHA-256 fingerprint + Jaccard similarity deduplication, actual entry removal, confidence boosting, stale pruning (>30 days + low confidence), keyword merging
-- **Orchestrator**: Storage-limit-triggered improvement cycles, fire-and-forget agent isolation, coding warm-up on start
-- **Lifecycle Manager**: Auto-loads 26 built-in knowledge entries on first start (`.initialized` flag guard)
-
-#### UI Control Panel (`app/dashboard/nexios-ai/page.tsx`)
-Full control panel accessible via "Nexios AI" in the sidebar:
-- Lifecycle controls: Start, Stop, Pause/Resume Learning buttons
-- Real-time agent panels with expandable logs + cycle counts
-- Knowledge base category breakdown + dataset source list
-- Built-in chat interface (enforces lifecycle state)
-- Continuous learning pipeline visualisation
-- Test-cycle button + results panel
-- Storage warning banner (shows at 85% capacity)
-- System error log viewer
 
 ### Environment Variables
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `MONGODB_URI` | MongoDB connection string | Yes (auth endpoints) |
+| `MONGODB_URI` | MongoDB connection string | Yes (auth) |
 | `JWT_SECRET` | JWT signing secret | Yes (auto-generated) |
 
 ### Running the App
 
 - **Dev server**: `npm run dev` (port 5000)
+- **Build + train**: `npm run build` (runs training pipeline then Next.js build)
+- **Training only**: `npm run train`
 - **Workflow**: "Start application"
-
-### GitHub Repository
-
-- URL: `https://github.com/Volttaik/Nexios`
-- Note: Git push requires the Replit project task system or manual CLI push

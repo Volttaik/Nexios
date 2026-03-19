@@ -1,42 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getEngine } from '../../../../nexios-ai/core/engine';
-import { getLifecycle } from '../../../../nexios-ai/lifecycle/manager';
+import { getInferenceEngine } from '../../../../nexios-ai/inference/engine';
 
 export async function POST(req: NextRequest) {
-  const lifecycle = getLifecycle();
-
-  /* Only respond in Running or Paused Learning states */
-  if (!lifecycle.isRunning()) {
-    return NextResponse.json(
-      { error: 'Nexios AI is not running. Start the AI first.', state: lifecycle.getState() },
-      { status: 503 }
-    );
-  }
-
   try {
     const body = await req.json();
-    const { message, prompt, sessionId } = body as { message?: string; prompt?: string; sessionId?: string };
+    const { message, prompt } = body as { message?: string; prompt?: string };
     const input = (message ?? prompt ?? '').trim();
 
     if (!input) {
       return NextResponse.json({ error: 'message is required' }, { status: 400 });
     }
 
-    const engine = getEngine();
-    const response = await engine.process(input, sessionId ?? 'default');
+    const engine = getInferenceEngine();
+    const response = await engine.process(input);
 
     return NextResponse.json({
       id: response.id,
       content: response.content,
       category: response.category,
       confidence: response.confidence,
-      sources: response.sources,
-      knowledgeEntriesUsed: response.knowledgeEntriesUsed,
       processingMs: response.processingMs,
-      model: 'nexios-ai',
+      modelVersion: response.modelVersion,
+      model: 'nexios-ai-v1',
       timestamp: response.timestamp,
-      aiState: lifecycle.getState(),
-      learningEnabled: lifecycle.getStatus().learningEnabled,
+      status: 'operational',
     });
   } catch (e) {
     console.error('[/api/nexios-ai/chat]', e);
@@ -45,10 +32,11 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  const lifecycle = getLifecycle();
+  const engine = getInferenceEngine();
+  const stats = engine.getStats();
   return NextResponse.json({
-    status: 'Nexios AI chat endpoint active',
-    model: 'nexios-ai',
-    aiState: lifecycle.getState(),
+    status: 'operational',
+    model: 'nexios-ai-v1',
+    ...stats,
   });
 }
