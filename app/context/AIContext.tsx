@@ -26,6 +26,21 @@ export interface AIProvider {
 
 export const AI_PROVIDERS: AIProvider[] = [
   {
+    id: 'nexios',
+    name: 'Nexios AI',
+    shortName: 'Nexios',
+    color: '#818cf8',
+    bgGradient: 'from-indigo-500 to-violet-600',
+    apiKeyPlaceholder: 'No key needed — runs locally',
+    icon: 'N',
+    isFree: true,
+    freeNote: 'Built-in local AI — no API key required. Learns continuously via Ultra Mode.',
+    models: [
+      { id: 'nexios-core', name: 'Nexios Core', description: 'Native AI — knowledge retrieval + reasoning', supportsImages: false, supportsCode: true, free: true },
+      { id: 'nexios-ultra', name: 'Nexios Ultra', description: 'Core + autonomous learning active', supportsImages: false, supportsCode: true, free: true },
+    ],
+  },
+  {
     id: 'gemini',
     name: 'Google Gemini',
     shortName: 'Gemini',
@@ -151,9 +166,10 @@ export interface AISettings {
 }
 
 const DEFAULT_SETTINGS: AISettings = {
-  activeProvider: 'gemini',
+  activeProvider: 'nexios',
   providers: {
-    gemini: { apiKey: '', selectedModel: 'gemini-2.0-flash', enabled: true },
+    nexios: { apiKey: '', selectedModel: 'nexios-core', enabled: true },
+    gemini: { apiKey: '', selectedModel: 'gemini-2.0-flash', enabled: false },
     groq: { apiKey: '', selectedModel: 'llama-3.3-70b-versatile', enabled: false },
     openai: { apiKey: '', selectedModel: 'gpt-4o', enabled: false },
     anthropic: { apiKey: '', selectedModel: 'claude-3-5-sonnet-20241022', enabled: false },
