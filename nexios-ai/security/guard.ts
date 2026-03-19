@@ -1,8 +1,8 @@
 import type { SecurityContext } from '../types/index';
 import fs from 'fs';
 import path from 'path';
+import { DATA_DIR } from '../utils/paths';
 
-const DATA_DIR  = path.join(process.cwd(), 'data', 'nexios-ai');
 const AUDIT_LOG = path.join(DATA_DIR, 'security-audit.log');
 
 const PROTECTED_PATHS = [
@@ -18,6 +18,7 @@ const PROTECTED_PATHS = [
 
 const ALLOWED_WRITE_PATHS = [
   'data/nexios-ai/',
+  '/tmp/nexios-ai/',
 ];
 
 const KNOWLEDGE_MODIFIERS = new Set([
