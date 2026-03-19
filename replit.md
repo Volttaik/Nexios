@@ -245,6 +245,23 @@ A fully autonomous, self-improving AI engine built into the platform under `nexi
 | `/api/nexios-ai/agents` | GET | Agent status + orchestrator stats |
 | `/api/nexios-ai/knowledge` | GET | KB stats, category counts, search |
 | `/api/nexios-ai/chat` | POST | Chat (only works when AI is Running/Paused) |
+| `/api/nexios-ai/status` | GET | v0.2.0 full status: lifecycle, storage, orchestrator |
+| `/api/nexios-ai/test` | POST | Diagnostic: full/quick pipeline test (all agents) |
+| `/api/nexios-ai/monitor` | GET | Health, storage stats, recent errors, checkpoints |
+
+#### Knowledge Storage Features (`nexios-ai/knowledge/storage.ts`)
+- Persistent JSON at `data/nexios-ai/knowledge-base.json`; auto-saves with 2s debounce
+- Hard cap: 100,000 entries; warns at 85% usage; `isFull()` blocks new writes
+- `remove()`, `removeMany()`, `update()`, `backup()`/`restoreBackup()` methods
+- All errors logged to `data/nexios-ai/errors.log`
+- Checkpoint system (max 50 checkpoints) saved to `data/nexios-ai/checkpoints.json`
+
+#### Agent Capabilities
+- **Seeker**: Retry logic, 500-item queue cap, phase-independent error isolation
+- **Coding**: Retry up to 3×, versioned encoding schema v1.2, batch processing, `warmUp()`, checkpoint every 5 cycles
+- **Self-Improving**: SHA-256 fingerprint + Jaccard similarity deduplication, actual entry removal, confidence boosting, stale pruning (>30 days + low confidence), keyword merging
+- **Orchestrator**: Storage-limit-triggered improvement cycles, fire-and-forget agent isolation, coding warm-up on start
+- **Lifecycle Manager**: Auto-loads 26 built-in knowledge entries on first start (`.initialized` flag guard)
 
 #### UI Control Panel (`app/dashboard/nexios-ai/page.tsx`)
 Full control panel accessible via "Nexios AI" in the sidebar:
@@ -253,6 +270,9 @@ Full control panel accessible via "Nexios AI" in the sidebar:
 - Knowledge base category breakdown + dataset source list
 - Built-in chat interface (enforces lifecycle state)
 - Continuous learning pipeline visualisation
+- Test-cycle button + results panel
+- Storage warning banner (shows at 85% capacity)
+- System error log viewer
 
 ### Environment Variables
 

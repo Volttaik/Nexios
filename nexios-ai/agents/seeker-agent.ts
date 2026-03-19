@@ -3,7 +3,9 @@ import { crawlBatch } from '../acquisition/crawler';
 import { fetchDataset, getDatasetCount } from '../datasets/fetcher';
 
 const CRAWL_PAGES_PER_CYCLE = 4;
-const LOG_LIMIT = 50;
+const LOG_LIMIT = 100;
+const MAX_PENDING = 500;
+const FETCH_RETRY = 2;
 
 export class SeekerAgent {
   private status: AgentStatus = {
@@ -20,7 +22,6 @@ export class SeekerAgent {
 
   private datasetCursor = 0;
 
-  /* collected pages/entries waiting to be consumed by CodingAgent */
   private pendingItems: Array<{
     content: string;
     category: import('../types/index').KnowledgeCategory;
@@ -42,74 +43,115 @@ export class SeekerAgent {
     return this.pendingItems.length > 0;
   }
 
+  pendingCount(): number {
+    return this.pendingItems.length;
+  }
+
   async runCycle(): Promise<void> {
     if (this.status.state === 'running') return;
     this.status.state = 'running';
     this.status.lastRunAt = Date.now();
 
-    this.log(`Cycle ${this.status.cyclesCompleted + 1} — web crawl + dataset fetch`);
+    const cycleNum = this.status.cyclesCompleted + 1;
+    this.log(`Cycle ${cycleNum} — web crawl + dataset fetch`);
 
     let gathered = 0;
 
-    /* Phase 1: web crawl */
+    /* ── Phase 1: Web crawl ─────────────────────────────────────────── */
     try {
       this.status.currentTask = 'Web crawling knowledge sources';
       this.log('Phase 1: crawling web sources…');
-      const pages = await crawlBatch(CRAWL_PAGES_PER_CYCLE);
-      for (const p of pages) {
-        if (p.isValid && p.content.length > 100) {
-          this.pendingItems.push({
-            content: p.content,
-            category: p.category,
-            source: p.url,
-            confidence: 0.75,
-          });
-          gathered++;
+
+      let pages = null;
+      for (let attempt = 1; attempt <= FETCH_RETRY; attempt++) {
+        try {
+          pages = await crawlBatch(CRAWL_PAGES_PER_CYCLE);
+          break;
+        } catch (e) {
+          if (attempt < FETCH_RETRY) {
+            this.log(`Web crawl attempt ${attempt} failed — retrying…`);
+            await new Promise(r => setTimeout(r, 1000 * attempt));
+          } else {
+            throw e;
+          }
         }
       }
-      this.log(`Web crawl: ${gathered} valid pages collected`);
-    } catch (e) {
-      this.status.errors++;
-      this.log(`Web crawl error: ${e instanceof Error ? e.message : String(e)}`);
-    }
 
-    /* Phase 2: dataset fetch */
-    try {
-      this.status.currentTask = 'Fetching structured dataset';
-      const idx = this.datasetCursor % getDatasetCount();
-      this.log(`Phase 2: fetching dataset #${idx}`);
-      const ds = await fetchDataset(idx);
-      this.datasetCursor++;
-
-      if (ds) {
-        for (const e of ds.entries) {
-          if (e.content.length > 60) {
+      if (pages) {
+        for (const p of pages) {
+          if (p.isValid && p.content.length > 100 && this.pendingItems.length < MAX_PENDING) {
             this.pendingItems.push({
-              content: e.content,
-              category: ds.category,
-              source: ds.name,
-              confidence: e.confidence,
+              content:    p.content,
+              category:   p.category,
+              source:     p.url,
+              confidence: 0.75,
             });
             gathered++;
           }
         }
-        this.log(`Dataset "${ds.name}": ${ds.entries.length} entries collected`);
+        this.log(`Web crawl: ${gathered} valid pages collected (${pages.length} fetched)`);
+      }
+    } catch (e) {
+      this.status.errors++;
+      this.log(`Web crawl error: ${e instanceof Error ? e.message : String(e)}`);
+      /* Continue to dataset phase even if crawl fails */
+    }
+
+    /* ── Phase 2: Dataset fetch ─────────────────────────────────────── */
+    try {
+      this.status.currentTask = 'Fetching structured dataset';
+      const idx = this.datasetCursor % Math.max(1, getDatasetCount());
+      this.log(`Phase 2: fetching dataset #${idx}`);
+
+      let ds = null;
+      for (let attempt = 1; attempt <= FETCH_RETRY; attempt++) {
+        try {
+          ds = await fetchDataset(idx);
+          break;
+        } catch (e) {
+          if (attempt < FETCH_RETRY) {
+            this.log(`Dataset fetch attempt ${attempt} failed — retrying…`);
+            await new Promise(r => setTimeout(r, 1000 * attempt));
+          } else {
+            throw e;
+          }
+        }
+      }
+
+      this.datasetCursor++;
+
+      if (ds && ds.entries.length > 0) {
+        let datasetGathered = 0;
+        for (const e of ds.entries) {
+          if (e.content.length > 60 && this.pendingItems.length < MAX_PENDING) {
+            this.pendingItems.push({
+              content:    e.content,
+              category:   ds.category,
+              source:     ds.name,
+              confidence: e.confidence,
+            });
+            gathered++;
+            datasetGathered++;
+          }
+        }
+        this.log(`Dataset "${ds.name}": ${datasetGathered} entries queued`);
       } else {
-        this.log('Dataset fetch returned no entries');
+        this.log('Dataset fetch returned no entries — skipping');
       }
     } catch (e) {
       this.status.errors++;
       this.log(`Dataset fetch error: ${e instanceof Error ? e.message : String(e)}`);
+      /* Self-contained failure — does not block other agents */
     }
 
     this.status.itemsProcessed += gathered;
     this.status.cyclesCompleted++;
     this.status.currentTask = null;
     this.status.state = 'completed';
-    this.log(`Cycle complete — ${gathered} items queued for encoding`);
+    this.log(`Cycle ${cycleNum} complete — ${gathered} items queued (${this.pendingItems.length} total pending)`);
   }
 
-  private log(msg: string) {
+  private log(msg: string): void {
     const ts = new Date().toISOString().slice(11, 19);
     this.status.log.unshift(`[${ts}] ${msg}`);
     if (this.status.log.length > LOG_LIMIT) this.status.log.length = LOG_LIMIT;

@@ -101,6 +101,9 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
   );
 }
 
+interface TestResult { success: boolean; summary: string; results: Record<string, unknown>; errors: string[] }
+interface MonitorData { health: { ok: boolean; warnings: string[]; failedAgents: string[] }; recentErrors: string[]; storage: { usagePercent: number; nearLimit: boolean; entries: number; maxEntries: number }; checkpoints: { count: number } }
+
 /* ── Main Page ────────────────────────────────────────────────────────── */
 export default function NexiosAIPage() {
   const [lifecycle, setLifecycle] = useState<LifecycleStatus | null>(null);
@@ -108,6 +111,14 @@ export default function NexiosAIPage() {
   const [knowledge, setKnowledge] = useState<KnowledgeStats | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
+
+  /* Test cycle */
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
+  const [showTest, setShowTest] = useState(false);
+
+  /* Monitoring */
+  const [monitor, setMonitor] = useState<MonitorData | null>(null);
 
   /* Chat */
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -121,14 +132,16 @@ export default function NexiosAIPage() {
   /* ── Polling ──────────────────────────────────────────────────────── */
   const fetchAll = useCallback(async () => {
     try {
-      const [lRes, aRes, kRes] = await Promise.all([
+      const [lRes, aRes, kRes, mRes] = await Promise.all([
         fetch('/api/nexios-ai/lifecycle'),
         fetch('/api/nexios-ai/agents'),
         fetch('/api/nexios-ai/knowledge?type=stats'),
+        fetch('/api/nexios-ai/monitor'),
       ]);
       if (lRes.ok) setLifecycle(await lRes.json());
       if (aRes.ok) setOrchestrator(await aRes.json());
       if (kRes.ok) setKnowledge(await kRes.json());
+      if (mRes.ok) setMonitor(await mRes.json());
     } catch { /* silent */ }
   }, []);
 
@@ -159,6 +172,27 @@ export default function NexiosAIPage() {
       setActionError(e instanceof Error ? e.message : 'Network error');
     } finally {
       setActionLoading(false);
+    }
+  }
+
+  async function runTestCycle() {
+    setTestLoading(true);
+    setTestResult(null);
+    try {
+      const res = await fetch('/api/nexios-ai/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'full' }),
+      });
+      const data = await res.json();
+      setTestResult(data);
+      setShowTest(true);
+      await fetchAll();
+    } catch (e) {
+      setTestResult({ success: false, summary: 'Network error', results: {}, errors: [e instanceof Error ? e.message : 'Unknown error'] });
+      setShowTest(true);
+    } finally {
+      setTestLoading(false);
     }
   }
 
@@ -283,6 +317,22 @@ export default function NexiosAIPage() {
               {learningOn ? 'Pause Learning' : 'Resume Learning'}
             </button>
           )}
+
+          {/* Test Cycle */}
+          <button
+            onClick={runTestCycle}
+            disabled={testLoading}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ml-auto"
+            style={{
+              background: '#0ea5e922',
+              color: '#0ea5e9',
+              border: '1px solid #0ea5e944',
+              opacity: testLoading ? 0.6 : 1,
+            }}
+          >
+            <BsArrowRepeat className={`w-4 h-4 ${testLoading ? 'animate-spin' : ''}`} />
+            {testLoading ? 'Testing…' : 'Run Test Cycle'}
+          </button>
         </div>
 
         {/* State description */}
@@ -528,6 +578,79 @@ export default function NexiosAIPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Storage Warning ─────────────────────────────────────────── */}
+      {monitor?.storage?.nearLimit && (
+        <div className="rounded-xl px-4 py-3 flex items-center gap-3" style={{ background: '#f59e0b18', border: '1px solid #f59e0b44' }}>
+          <BsDatabase className="w-4 h-4 shrink-0" style={{ color: '#f59e0b' }} />
+          <p className="text-sm" style={{ color: '#f59e0b' }}>
+            Knowledge base at <strong>{monitor.storage.usagePercent}%</strong> capacity ({monitor.storage.entries.toLocaleString()}/{monitor.storage.maxEntries.toLocaleString()} entries). Self-Improving Agent will deduplicate automatically.
+          </p>
+        </div>
+      )}
+
+      {/* ── Test Results Panel ──────────────────────────────────────── */}
+      {showTest && testResult && (
+        <div className="rounded-2xl p-5 space-y-3" style={{ background: 'var(--bg-card)', border: `1px solid ${testResult.success ? '#10b98144' : '#ef444444'}` }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BsCircleFill className="w-2 h-2" style={{ color: testResult.success ? '#10b981' : '#ef4444' }} />
+              <p className="text-sm font-semibold" style={{ color: testResult.success ? '#10b981' : '#ef4444' }}>
+                {testResult.success ? 'All Systems Operational' : 'Test Issues Detected'}
+              </p>
+            </div>
+            <button onClick={() => setShowTest(false)} className="text-xs px-2 py-1 rounded" style={{ color: 'var(--text-muted)', background: 'var(--bg-secondary)' }}>
+              Dismiss
+            </button>
+          </div>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{testResult.summary}</p>
+
+          {/* Test result grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {Object.entries(testResult.results).map(([key, val]) => {
+              const r = val as Record<string, unknown>;
+              const ok = r?.ok !== false && r?.skipped !== true;
+              return (
+                <div key={key} className="rounded-lg p-2 text-[11px]" style={{ background: ok ? '#10b98110' : '#ef444410', border: `1px solid ${ok ? '#10b98130' : '#ef444430'}` }}>
+                  <p className="font-semibold capitalize" style={{ color: ok ? '#10b981' : '#ef4444' }}>{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                  {typeof r?.entries === 'number' && <p style={{ color: 'var(--text-muted)' }}>Entries: {String(r.entries)}</p>}
+                  {typeof r?.itemsEncoded === 'number' && <p style={{ color: 'var(--text-muted)' }}>Encoded: {String(r.itemsEncoded)}</p>}
+                  {typeof r?.resultsFound === 'number' && <p style={{ color: 'var(--text-muted)' }}>Found: {String(r.resultsFound)}</p>}
+                </div>
+              );
+            })}
+          </div>
+
+          {testResult.errors.length > 0 && (
+            <div className="rounded-lg p-3 space-y-1" style={{ background: '#ef444410', border: '1px solid #ef444430' }}>
+              <p className="text-[11px] font-semibold" style={{ color: '#ef4444' }}>Errors ({testResult.errors.length})</p>
+              {testResult.errors.map((e, i) => (
+                <p key={i} className="text-[11px] font-mono" style={{ color: '#ef4444' }}>{e}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Health & Recent Error Log ────────────────────────────────── */}
+      {monitor && monitor.recentErrors.length > 0 && (
+        <div className="rounded-2xl p-4 space-y-2" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
+          <div className="flex items-center gap-2">
+            <BsCircleFill className="w-2 h-2" style={{ color: monitor.health.ok ? '#10b981' : '#f59e0b' }} />
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>System Log</p>
+            <span className="ml-auto text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
+              {monitor.checkpoints.count} checkpoints
+            </span>
+          </div>
+          <div className="rounded-lg p-3 max-h-32 overflow-y-auto space-y-0.5" style={{ background: 'var(--bg-secondary)', scrollbarWidth: 'none' }}>
+            {monitor.recentErrors.slice(0, 10).map((line, i) => (
+              <p key={i} className="text-[10px] font-mono" style={{ color: line.includes('ERROR') ? '#ef4444' : line.includes('WARN') ? '#f59e0b' : 'var(--text-muted)' }}>
+                {line}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Learning Pipeline Visualisation ────────────────────────── */}
       <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--glass-border)' }}>
