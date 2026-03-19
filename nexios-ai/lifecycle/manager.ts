@@ -1,8 +1,8 @@
 import type { LifecycleState, LifecycleStatus } from '../types/index';
 import fs from 'fs';
 import path from 'path';
+import { DATA_DIR } from '../utils/paths';
 
-const DATA_DIR = path.join(process.cwd(), 'data', 'nexios-ai');
 const INIT_FLAG = path.join(DATA_DIR, '.initialized');
 
 function ensureDataDir(): void {
