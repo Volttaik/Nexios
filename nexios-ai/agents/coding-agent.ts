@@ -1,6 +1,7 @@
 import type { AgentStatus, KnowledgeCategory } from '../types/index';
 import { getStorage } from '../knowledge/storage';
 import { createCheckpoint } from '../checkpoint/checkpoint';
+import { getStructuredLearner } from '../learning/structured-learner';
 import crypto from 'crypto';
 
 const LOG_LIMIT = 100;
@@ -193,6 +194,15 @@ export class CodingAgent {
         this.log(`Checkpoint failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
+
+    /* Check structured learning progression */
+    try {
+      const learner = getStructuredLearner();
+      const advance = learner.checkAndAdvance(storage.count());
+      if (advance.advanced) {
+        this.log(`Learning section mastered: "${advance.from}" → next: "${advance.to ?? 'All complete'}"`);
+      }
+    } catch { /* non-critical */ }
 
     return added;
   }
