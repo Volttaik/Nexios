@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Nexios AI Chat — powered by OpenClaw gateway
+ * Nexios AI Chat — calls the LLM provider directly
  *
- * Proxies chat requests to OpenClaw's OpenAI-compatible /v1/chat/completions
- * endpoint on the local gateway. All the intelligence comes from real models
- * (Claude, GPT, Gemini, etc.) — branded as "Nexios AI".
+ * Routes chat requests to the configured LLM API (e.g. llm.atxp.ai)
+ * using OpenAI-compatible /v1/chat/completions format.
+ *
+ * Required env vars on Vercel:
+ *   LLM_BASE_URL  — e.g. https://llm.atxp.ai
+ *   LLM_API_KEY   — your API key for the LLM provider
  */
 
-const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'http://127.0.0.1:18790';
-const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || '';
+const LLM_BASE_URL = process.env.LLM_BASE_URL || 'https://llm.atxp.ai';
+const LLM_API_KEY = process.env.LLM_API_KEY || '';
 
 const NEXIOS_SYSTEM_PROMPT = `You are Nexios AI, a powerful intelligent assistant built into the Nexios platform. You help users with coding, design, science, mathematics, history, writing, and general knowledge.
 
@@ -21,20 +24,27 @@ Guidelines:
 - If you don't know something, say so honestly
 - You are running locally within the Nexios platform — no external API keys are needed from the user's perspective`;
 
-// Map Nexios model IDs to real OpenClaw model identifiers
+// Map Nexios model IDs to the actual model IDs on the LLM provider
 const MODEL_MAP: Record<string, string> = {
-  'nexios-core': 'anthropic/claude-sonnet-4-6',
-  'nexios-ultra': 'anthropic/claude-opus-4-6',
-  'nexios-flash': 'anthropic/claude-haiku-4-5',
-  'nexios-gpt': 'openai/gpt-5.2',
-  'nexios-gpt-pro': 'openai/gpt-5.2-pro',
-  'nexios-gemini': 'google-ai-studio/gemini-3.1-pro-preview',
-  'nexios-grok': 'grok/grok-4',
-  'nexios-deepseek': 'deepseek/deepseek-v3.2',
-  'nexios-reasoning': 'openai/o4-mini',
+  'nexios-core':      'claude-sonnet-4-6',
+  'nexios-ultra':     'claude-opus-4-6',
+  'nexios-flash':     'claude-haiku-4-5',
+  'nexios-gpt':       'gpt-5.2',
+  'nexios-gpt-pro':   'gpt-5.2-pro',
+  'nexios-gemini':    'gemini-3.1-pro-preview',
+  'nexios-grok':      'grok-4',
+  'nexios-deepseek':  'deepseek-v3.2',
+  'nexios-reasoning': 'o4-mini',
 };
 
 export async function POST(req: NextRequest) {
+  if (!LLM_API_KEY) {
+    return NextResponse.json(
+      { error: 'LLM_API_KEY not configured. Set it in your Vercel environment variables.' },
+      { status: 500 }
+    );
+  }
+
   try {
     const body = await req.json();
     const { message, prompt, messages: clientMessages, model: requestedModel, stream } = body as {
@@ -68,11 +78,11 @@ export async function POST(req: NextRequest) {
 
     if (stream) {
       // Streaming response
-      const upstreamRes = await fetch(`${OPENCLAW_GATEWAY_URL}/v1/chat/completions`, {
+      const upstreamRes = await fetch(`${LLM_BASE_URL}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENCLAW_GATEWAY_TOKEN}`,
+          'Authorization': `Bearer ${LLM_API_KEY}`,
         },
         body: JSON.stringify({
           model: resolvedModel,
@@ -101,11 +111,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Non-streaming response
-    const upstreamRes = await fetch(`${OPENCLAW_GATEWAY_URL}/v1/chat/completions`, {
+    const upstreamRes = await fetch(`${LLM_BASE_URL}/v1/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENCLAW_GATEWAY_TOKEN}`,
+        'Authorization': `Bearer ${LLM_API_KEY}`,
       },
       body: JSON.stringify({
         model: resolvedModel,
@@ -148,31 +158,35 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  // Health check — verify OpenClaw gateway is reachable
-  let gatewayStatus = 'unknown';
-  try {
-    const res = await fetch(`${OPENCLAW_GATEWAY_URL}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENCLAW_GATEWAY_TOKEN}`,
-      },
-      body: JSON.stringify({
-        model: MODEL_MAP['nexios-core'],
-        messages: [{ role: 'user', content: 'ping' }],
-        max_tokens: 5,
-      }),
-    });
-    gatewayStatus = res.ok ? 'connected' : `error-${res.status}`;
-  } catch {
-    gatewayStatus = 'unreachable';
+  // Health check
+  let providerStatus = 'unknown';
+  if (!LLM_API_KEY) {
+    providerStatus = 'no-api-key';
+  } else {
+    try {
+      const res = await fetch(`${LLM_BASE_URL}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${LLM_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: MODEL_MAP['nexios-core'],
+          messages: [{ role: 'user', content: 'ping' }],
+          max_tokens: 5,
+        }),
+      });
+      providerStatus = res.ok ? 'connected' : `error-${res.status}`;
+    } catch {
+      providerStatus = 'unreachable';
+    }
   }
 
   return NextResponse.json({
-    status: 'operational',
+    status: providerStatus === 'connected' ? 'operational' : 'degraded',
     model: 'nexios-ai-v2',
-    engine: 'openclaw-gateway',
-    gateway: gatewayStatus,
+    engine: 'direct-llm',
+    provider: providerStatus,
     availableModels: Object.keys(MODEL_MAP),
   });
 }
