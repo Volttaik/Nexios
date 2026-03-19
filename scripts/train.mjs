@@ -91,16 +91,11 @@ async function trainWithTensorFlow(trainingData, vocab) {
   try {
     let tf;
     try {
-      tf = require('@tensorflow/tfjs-node');
-      log('TensorFlow.js (native) loaded successfully', 'success');
+      tf = require('@tensorflow/tfjs');
+      log('TensorFlow.js loaded successfully', 'success');
     } catch (_e) {
-      try {
-        tf = require('@tensorflow/tfjs');
-        log('TensorFlow.js (pure JS) loaded successfully', 'success');
-      } catch (_e2) {
-        log('TensorFlow not available — using knowledge-base inference only.', 'warn');
-        return null;
-      }
+      log('TensorFlow not available — using knowledge-base inference only.', 'warn');
+      return null;
     }
 
     const CATEGORIES = ['general', 'programming', 'design', 'mathematics', 'science'];
@@ -269,7 +264,12 @@ async function runTrainingPipeline() {
 
   header('STAGE 4 — TensorFlow Model Training');
 
-  const tfResult = await trainWithTensorFlow(allEntries, vocab);
+  let tfResult = null;
+  try {
+    tfResult = await trainWithTensorFlow(allEntries, vocab);
+  } catch (err) {
+    log(`TensorFlow training encountered an error: ${err.message}. Proceeding with knowledge-base only.`, 'warn');
+  }
 
   if (tfResult) {
     log(`Model accuracy: ${(tfResult.finalAcc * 100).toFixed(1)}%`, tfResult.finalAcc > 0.5 ? 'success' : 'warn');
