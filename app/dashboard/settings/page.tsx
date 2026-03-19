@@ -10,11 +10,9 @@ export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [tempKey, setTempKey] = useState('');
   const [autonomousMode, setAutonomousMode] = useState(false);
   const profileInputRef = useRef<HTMLInputElement>(null);
-  const { settings, updateProviderConfig, setActiveProvider, setActiveModel, getApiKey } = useAI();
+  const { settings, setActiveModel } = useAI();
   const { isDark, toggleTheme, uiStyle, setUIStyle, bgPattern, setBGPattern } = useTheme();
 
   useEffect(() => {
@@ -50,14 +48,6 @@ export default function SettingsPage() {
     e.target.value = '';
   };
 
-  const handleSaveKey = (providerId: string) => {
-    updateProviderConfig(providerId, { apiKey: tempKey.trim() });
-    setEditingKey(null);
-    setTempKey('');
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
-  };
-
   const handleClearChats = () => {
     if (confirm('This will permanently delete all chat history. Continue?')) {
       localStorage.removeItem('chatSessions');
@@ -73,6 +63,9 @@ export default function SettingsPage() {
   };
 
   if (!mounted) return null;
+
+  const provider = AI_PROVIDERS[0]; // Nexios
+  const currentModel = settings.providers.nexios?.selectedModel || 'nexios-core';
 
   const UI_STYLES: Array<{ id: UIStyle; label: string; desc: string; preview: string }> = [
     { id: 'flat', label: 'Flat', desc: 'Clean & minimal', preview: '□' },
@@ -95,7 +88,7 @@ export default function SettingsPage() {
     <div className="space-y-5 max-w-2xl pb-12">
       <div>
         <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Settings</h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--text2)' }}>Manage your account, AI providers, and appearance</p>
+        <p className="text-sm mt-1" style={{ color: 'var(--text2)' }}>Manage your account, AI model, and appearance</p>
       </div>
 
       {/* Profile */}
@@ -126,107 +119,53 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* AI Providers */}
+      {/* AI Model Selection */}
       <div className={sectionCard}>
         <div>
-          <h2 className="text-sm font-bold" style={{ color: 'var(--text)' }}>AI Providers</h2>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text2)' }}>Configure providers and API keys. Groq is free — get your key at console.groq.com</p>
+          <h2 className="text-sm font-bold" style={{ color: 'var(--text)' }}>AI Model</h2>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text2)' }}>
+            All models are powered by Nexios AI — no API keys needed. Choose the model that fits your needs.
+          </p>
         </div>
-        <div className="space-y-3">
-          {AI_PROVIDERS.map(provider => {
-            const config = settings.providers[provider.id];
-            const isActive = settings.activeProvider === provider.id;
-            const hasKey = !!(config?.apiKey?.trim() || getApiKey(provider.id));
-            return (
-              <div key={provider.id} className="rounded-xl p-4 border transition-all"
-                style={{ background: 'var(--bg)', borderColor: isActive ? provider.color + '80' : 'var(--border)', borderWidth: isActive ? 2 : 1 }}>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: provider.color }}>
-                    {provider.icon}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{provider.name}</p>
-                      {provider.isFree && <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: '#10b98120', color: '#10b981' }}>FREE</span>}
-                    </div>
-                    <p className="text-xs" style={{ color: 'var(--text2)' }}>{provider.models.length} models · {provider.freeNote || `${provider.apiKeyPlaceholder}`}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {hasKey && <span className="w-2 h-2 rounded-full bg-green-400" title="API key configured" />}
-                    <button onClick={() => setActiveProvider(provider.id)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border"
-                      style={{ background: isActive ? provider.color : 'transparent', borderColor: isActive ? 'transparent' : 'var(--border)', color: isActive ? '#fff' : 'var(--text2)' }}>
-                      {isActive ? '✓ Active' : 'Select'}
-                    </button>
-                  </div>
-                </div>
 
-                {isActive && (
-                  <div className="mb-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text2)' }}>Model</p>
-                    <div className="grid grid-cols-1 gap-1.5">
-                      {provider.models.map(m => (
-                        <button key={m.id} onClick={() => setActiveModel(m.id)}
-                          className="flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all border"
-                          style={{
-                            background: config?.selectedModel === m.id ? provider.color + '15' : 'var(--bg2)',
-                            borderColor: config?.selectedModel === m.id ? provider.color + '60' : 'var(--border)',
-                          }}>
-                          <div>
-                            <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{m.name}</span>
-                            <span className="text-xs mx-2" style={{ color: 'var(--text3)' }}>·</span>
-                            <span className="text-xs" style={{ color: 'var(--text2)' }}>{m.description}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {m.supportsImages && <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--bg3)', color: 'var(--text3)' }}>Vision</span>}
-                            {(m as { free?: boolean }).free && <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: '#10b98115', color: '#10b981' }}>Free</span>}
-                            {config?.selectedModel === m.id && (
-                              <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5" style={{ color: provider.color }}>
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
-                              </svg>
-                            )}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+        <div className="rounded-xl p-4 border transition-all" style={{ background: 'var(--bg)', borderColor: provider.color + '80', borderWidth: 2 }}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: provider.color }}>
+              {provider.icon}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{provider.name}</p>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: '#10b98120', color: '#10b981' }}>FREE</span>
+              </div>
+              <p className="text-xs" style={{ color: 'var(--text2)' }}>{provider.models.length} models · Built-in AI powered by state-of-the-art models</p>
+            </div>
+          </div>
 
+          <div className="grid grid-cols-1 gap-1.5">
+            {provider.models.map(m => (
+              <button key={m.id} onClick={() => { setActiveModel(m.id); setSaved(true); setTimeout(() => setSaved(false), 2500); }}
+                className="flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition-all border"
+                style={{
+                  background: currentModel === m.id ? provider.color + '15' : 'var(--bg2)',
+                  borderColor: currentModel === m.id ? provider.color + '60' : 'var(--border)',
+                }}>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text2)' }}>API Key</p>
-                  {editingKey === provider.id ? (
-                    <div className="flex gap-2">
-                      <input type="password" value={tempKey} onChange={e => setTempKey(e.target.value)}
-                        placeholder={provider.apiKeyPlaceholder}
-                        onKeyDown={e => { if (e.key === 'Enter') handleSaveKey(provider.id); if (e.key === 'Escape') setEditingKey(null); }}
-                        className="input-field flex-1" autoFocus />
-                      <button onClick={() => handleSaveKey(provider.id)} className="px-3 py-2 rounded-xl text-xs font-semibold text-white transition-colors" style={{ background: provider.color }}>Save</button>
-                      <button onClick={() => setEditingKey(null)} className="px-3 py-2 rounded-xl text-xs font-medium transition-colors border" style={{ borderColor: 'var(--border)', color: 'var(--text2)' }}>Cancel</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => { setEditingKey(provider.id); setTempKey(config?.apiKey || ''); }}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs text-left transition-all border"
-                      style={{ background: 'var(--bg2)', borderColor: 'var(--border)', color: 'var(--text2)' }}
-                      onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
-                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4 shrink-0" style={{ color: 'var(--text3)' }}><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-                      <span className="flex-1 font-mono truncate">
-                        {config?.apiKey ? '••••••••' + config.apiKey.slice(-4) : getApiKey(provider.id) ? '(Using default key)' : 'Click to add API key…'}
-                      </span>
-                      {config?.apiKey && (
-                        <button onClick={e => { e.stopPropagation(); updateProviderConfig(provider.id, { apiKey: '' }); }}
-                          className="text-[10px] px-1.5 py-0.5 rounded-lg text-red-400 transition-colors"
-                          onMouseEnter={e => (e.currentTarget.style.background = '#ef444415')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                          Clear
-                        </button>
-                      )}
-                    </button>
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{m.name}</span>
+                  <span className="text-xs mx-2" style={{ color: 'var(--text3)' }}>·</span>
+                  <span className="text-xs" style={{ color: 'var(--text2)' }}>{m.description}</span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: '#10b98115', color: '#10b981' }}>Free</span>
+                  {currentModel === m.id && (
+                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5" style={{ color: provider.color }}>
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                    </svg>
                   )}
                 </div>
-              </div>
-            );
-          })}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

@@ -179,7 +179,7 @@ export default function DocumentEditor({ content, onChange, projectName, project
   const [zoom, setZoom] = useState(100);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { activeProvider, activeModel, getApiKey } = useAI();
+  const { activeProvider, activeModel } = useAI();
   const [messages, setMessages] = useState<ChatMsg[]>([
     { role: 'assistant', content: 'Hi! I\'m your document AI. Ask me to draft content, improve your writing, suggest structure, or type "write intro about X" and I\'ll create content you can insert directly.', timestamp: Date.now() },
   ]);
@@ -292,11 +292,6 @@ export default function DocumentEditor({ content, onChange, projectName, project
 
   const sendMessage = async () => {
     if (!chatInput.trim() || aiLoading) return;
-    const apiKey = getApiKey(activeProvider.id);
-    if (!apiKey) {
-      setMessages(p => [...p, { role: 'assistant', content: `Please add your ${activeProvider.name} API key in Settings to use AI assistance.`, timestamp: Date.now() }]);
-      return;
-    }
     const userMsg = chatInput.trim();
     setChatInput('');
     setMessages(p => [...p, { role: 'user', content: userMsg, timestamp: Date.now() }]);
@@ -328,7 +323,7 @@ Always write in a professional, clear style appropriate for the document context
         { role: 'user' as const, content: userMsg },
       ];
 
-      const response = await callAI(activeProvider.id, activeModel.id, msgsForAI, apiKey);
+      const response = await callAI(activeProvider.id, activeModel.id, msgsForAI);
       const insertable = parseInsertable(response);
 
       // Automatically insert content directly into the document — no confirmation needed

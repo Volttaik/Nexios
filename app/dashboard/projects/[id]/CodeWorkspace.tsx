@@ -14,9 +14,8 @@ import {
   HiArrowLeft, HiX, HiFolder, HiMenu, HiCode,
 } from 'react-icons/hi';
 import Link from 'next/link';
-import { useAI } from '@/app/context/AIContext';
+import { useAI, AI_PROVIDERS } from '@/app/context/AIContext';
 import { callAI } from '@/app/lib/ai';
-import { AI_PROVIDERS } from '@/app/context/AIContext';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
@@ -284,7 +283,7 @@ interface Props {
 
 export default function CodeWorkspace({ project }: Props) {
   const id = project.id;
-  const { activeProvider, activeModel, getApiKey } = useAI();
+  const { activeProvider, activeModel } = useAI();
 
   const [files, setFiles] = useState<FileNode[]>([]);
   const [selectedPath, setSelectedPath] = useState('');
@@ -564,11 +563,6 @@ export default function CodeWorkspace({ project }: Props) {
 
   const sendMessage = async () => {
     if (!input.trim() || aiLoading) return;
-    const apiKey = getApiKey(activeProvider.id);
-    if (!apiKey) {
-      setMessages(p => [...p, { role: 'assistant', content: `⚠️ Please add your ${activeProvider.name} API key in Settings.`, timestamp: Date.now() }]);
-      return;
-    }
     const userMsg = input.trim();
     setInput('');
     setMessages(p => [...p, { role: 'user', content: userMsg, timestamp: Date.now() }]);
@@ -619,7 +613,7 @@ ${currentFileCtx}`;
       ];
 
       addActivity('thinking', 'Contacting AI model...');
-      const response = await callAI(activeProvider.id, activeModel.id, messagesForAI, apiKey);
+      const response = await callAI(activeProvider.id, activeModel.id, messagesForAI);
       setAgentPhase('coding');
       const ops = parseFileOps(response);
 
@@ -716,16 +710,13 @@ ${currentFileCtx}`;
           </button>
           {showModelSelector && (
             <div className="absolute right-0 top-full mt-1 z-50 rounded-xl shadow-2xl border overflow-hidden" style={{ background: '#1a1e28', borderColor: 'rgba(255,255,255,0.1)', width: 260 }}>
-              {AI_PROVIDERS.map(provider => (
-                <div key={provider.id}>
-                  <div className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest text-white/25">{provider.name}</div>
-                  {provider.models.map(m => (
-                    <button key={m.id} onClick={() => { setShowModelSelector(false); }}
-                      className="w-full text-left px-4 py-1.5 text-[11px] hover:bg-white/5 transition-colors text-white/55 hover:text-white/90">
-                      {m.name}
-                    </button>
-                  ))}
-                </div>
+              <div className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest text-white/25">Nexios AI</div>
+              {AI_PROVIDERS[0].models.map(m => (
+                <button key={m.id} onClick={() => { setShowModelSelector(false); }}
+                  className={`w-full text-left px-4 py-1.5 text-[11px] hover:bg-white/5 transition-colors ${activeModel.id === m.id ? 'text-indigo-300 bg-indigo-500/10' : 'text-white/55 hover:text-white/90'}`}>
+                  {m.name}
+                  <span className="text-[9px] ml-2 text-white/25">{m.description}</span>
+                </button>
               ))}
             </div>
           )}

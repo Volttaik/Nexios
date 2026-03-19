@@ -288,7 +288,7 @@ export default function DesignEditor({ projectId, projectName }: DesignEditorPro
   const svgRef = useRef<SVGSVGElement>(null);
 
   // AI state
-  const { activeProvider, activeModel, getApiKey } = useAI();
+  const { activeProvider, activeModel } = useAI();
   const [messages, setMessages] = useState<ChatMsg[]>([
     { role: 'assistant', content: 'Hi! I\'m your design assistant. Ask me about color palettes, layout, typography, visual hierarchy, or design best practices.', timestamp: Date.now() },
   ]);
@@ -566,11 +566,6 @@ export default function DesignEditor({ projectId, projectName }: DesignEditorPro
   // ── AI ──
   const sendMessage = async () => {
     if (!chatInput.trim() || aiLoading) return;
-    const apiKey = getApiKey(activeProvider.id);
-    if (!apiKey) {
-      setMessages(p => [...p, { role: 'assistant', content: `Please add your ${activeProvider.name} API key in Settings.`, timestamp: Date.now() }]);
-      return;
-    }
     const userMsg = chatInput.trim();
     setChatInput('');
     setMessages(p => [...p, { role: 'user', content: userMsg, timestamp: Date.now() }]);
@@ -585,7 +580,7 @@ Be concise and practical.`;
         ...messages.slice(-6).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
         { role: 'user' as const, content: userMsg },
       ];
-      const response = await callAI(activeProvider.id, activeModel.id, msgsForAI, apiKey);
+      const response = await callAI(activeProvider.id, activeModel.id, msgsForAI);
       setMessages(p => [...p, { role: 'assistant', content: response, timestamp: Date.now() }]);
     } catch (err: any) {
       setMessages(p => [...p, { role: 'assistant', content: `Error: ${err.message}`, timestamp: Date.now() }]);

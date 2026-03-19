@@ -85,7 +85,7 @@ const SUGGESTIONS = [
 ];
 
 export default function ChatPage() {
-  const { activeProvider, activeModel, getApiKey } = useAI();
+  const { activeProvider, activeModel } = useAI();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string>('');
   const [input, setInput] = useState('');
@@ -204,8 +204,7 @@ export default function ChatPage() {
     try {
       const history: ChatMessage[] = messages.map(m => ({ role: m.sender === 'user' ? 'user' : 'assistant', content: m.text, imageBase64List: m.imageUrls }));
       const userChatMsg: ChatMessage = { role: 'user', content: currentInput, imageBase64List: currentImages.length > 0 ? currentImages : undefined };
-      const apiKey = getApiKey(activeProvider.id);
-      const response = await callAI(activeProvider.id, activeModel.id, [...history, userChatMsg], apiKey);
+      const response = await callAI(activeProvider.id, activeModel.id, [...history, userChatMsg]);
       const aiMsg: Message = { id: genId(), text: response, sender: 'ai', timestamp: new Date(), provider: activeProvider.id, model: activeModel.id };
       setSessions(prev => prev.map(s => s.id === sid ? { ...s, messages: [...s.messages, aiMsg], updatedAt: new Date() } : s));
     } catch (err: unknown) {
