@@ -1,0 +1,91 @@
+{
+  "version": "1.0.0",
+  "buildDate": "2026-03-19T16:48:40.634Z",
+  "buildDurationMs": 705,
+  "trainingExamples": 62,
+  "vocabularySize": 93,
+  "categories": [
+    "general",
+    "programming",
+    "design",
+    "mathematics",
+    "science"
+  ],
+  "validationScore": 1,
+  "validationResults": {
+    "passed": 8,
+    "failed": 0,
+    "total": 8,
+    "results": [
+      {
+        "prompt": "hello",
+        "status": "pass",
+        "score": 1
+      },
+      {
+        "prompt": "what is javascript",
+        "status": "pass",
+        "score": 1
+      },
+      {
+        "prompt": "what is ui design",
+        "status": "pass",
+        "score": 1
+      },
+      {
+        "prompt": "what is the pythagorean theorem",
+        "status": "pass",
+        "score": 1
+      },
+      {
+        "prompt": "what is gravity",
+        "status": "pass",
+        "score": 1
+      },
+      {
+        "prompt": "write a react component",
+        "status": "pass",
+        "score": 1
+      },
+      {
+        "prompt": "explain async await",
+        "status": "pass",
+        "score": 1
+      },
+      {
+        "prompt": "what makes a good button design",
+        "status": "pass",
+        "score": 1
+      }
+    ]
+  },
+  "architecture": "knowledge-base-with-tfjs-classifier",
+  "status": "validated",
+  "phases": [
+    {
+      "id": "basic-interactions",
+      "label": "Basic Interactions & Conversations",
+      "examples": 19
+    },
+    {
+      "id": "programming",
+      "label": "Programming & Coding Knowledge",
+      "examples": 18
+    },
+    {
+      "id": "design",
+      "label": "Design & UI/UX Principles",
+      "examples": 10
+    },
+    {
+      "id": "mathematics",
+      "label": "Mathematics & Reasoning",
+      "examples": 8
+    },
+    {
+      "id": "science",
+      "label": "Science & Natural Philosophy",
+      "examples": 7
+    }
+  ]
+}

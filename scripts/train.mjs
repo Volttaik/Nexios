@@ -88,85 +88,95 @@ function cosineSimilarity(a, b) {
 }
 
 async function trainWithTensorFlow(trainingData, vocab) {
-  let tf;
   try {
-    tf = require('@tensorflow/tfjs-node');
-    log('TensorFlow.js loaded successfully', 'success');
-  } catch (e) {
-    log(`TensorFlow not available: ${e.message}. Using lightweight trainer.`, 'warn');
-    return null;
-  }
-
-  const CATEGORIES = ['general', 'programming', 'design', 'mathematics', 'science'];
-  const MAX_LEN = 20;
-  const VOCAB_SIZE = Math.min(Object.keys(vocab).length, 500);
-  const EMBED_DIM = 16;
-  const NUM_CLASSES = CATEGORIES.length;
-
-  log(`Building model: vocab=${VOCAB_SIZE}, embed=${EMBED_DIM}, classes=${NUM_CLASSES}`);
-
-  const model = tf.sequential({
-    layers: [
-      tf.layers.embedding({ inputDim: VOCAB_SIZE, outputDim: EMBED_DIM, inputLength: MAX_LEN, name: 'embedding' }),
-      tf.layers.globalAveragePooling1d({ name: 'pooling' }),
-      tf.layers.dense({ units: 32, activation: 'relu', name: 'hidden' }),
-      tf.layers.dropout({ rate: 0.2, name: 'dropout' }),
-      tf.layers.dense({ units: NUM_CLASSES, activation: 'softmax', name: 'output' }),
-    ],
-  });
-
-  model.compile({
-    optimizer: tf.train.adam(0.005),
-    loss: 'sparseCategoricalCrossentropy',
-    metrics: ['accuracy'],
-  });
-
-  const xs = [];
-  const ys = [];
-
-  for (const item of trainingData) {
-    const vec = vectorise(item.input, vocab, MAX_LEN).map(v => Math.min(v, VOCAB_SIZE - 1));
-    const catIdx = CATEGORIES.indexOf(item.category);
-    if (catIdx >= 0) {
-      xs.push(vec);
-      ys.push(catIdx);
+    let tf;
+    try {
+      tf = require('@tensorflow/tfjs-node');
+      log('TensorFlow.js (native) loaded successfully', 'success');
+    } catch (_e) {
+      try {
+        tf = require('@tensorflow/tfjs');
+        log('TensorFlow.js (pure JS) loaded successfully', 'success');
+      } catch (_e2) {
+        log('TensorFlow not available — using knowledge-base inference only.', 'warn');
+        return null;
+      }
     }
-  }
 
-  if (xs.length === 0) {
-    log('No training data to fit model', 'warn');
+    const CATEGORIES = ['general', 'programming', 'design', 'mathematics', 'science'];
+    const MAX_LEN = 20;
+    const VOCAB_SIZE = Math.min(Object.keys(vocab).length, 500);
+    const EMBED_DIM = 16;
+    const NUM_CLASSES = CATEGORIES.length;
+
+    log(`Building model: vocab=${VOCAB_SIZE}, embed=${EMBED_DIM}, classes=${NUM_CLASSES}`);
+
+    const model = tf.sequential({
+      layers: [
+        tf.layers.embedding({ inputDim: VOCAB_SIZE, outputDim: EMBED_DIM, inputLength: MAX_LEN, name: 'embedding' }),
+        tf.layers.globalAveragePooling1d({ name: 'pooling' }),
+        tf.layers.dense({ units: 32, activation: 'relu', name: 'hidden' }),
+        tf.layers.dropout({ rate: 0.2, name: 'dropout' }),
+        tf.layers.dense({ units: NUM_CLASSES, activation: 'softmax', name: 'output' }),
+      ],
+    });
+
+    model.compile({
+      optimizer: tf.train.adam(0.005),
+      loss: 'sparseCategoricalCrossentropy',
+      metrics: ['accuracy'],
+    });
+
+    const xs = [];
+    const ys = [];
+
+    for (const item of trainingData) {
+      const vec = vectorise(item.input, vocab, MAX_LEN).map(v => Math.min(v, VOCAB_SIZE - 1));
+      const catIdx = CATEGORIES.indexOf(item.category);
+      if (catIdx >= 0) {
+        xs.push(vec);
+        ys.push(catIdx);
+      }
+    }
+
+    if (xs.length === 0) {
+      log('No training data to fit model', 'warn');
+      return null;
+    }
+
+    const xTensor = tf.tensor2d(xs, [xs.length, MAX_LEN], 'int32');
+    const yTensor = tf.tensor1d(ys, 'int32');
+
+    log(`Training on ${xs.length} examples for 15 epochs...`);
+
+    const history = await model.fit(xTensor, yTensor, {
+      epochs: 15,
+      batchSize: 8,
+      validationSplit: 0.15,
+      shuffle: true,
+      verbose: 0,
+      callbacks: {
+        onEpochEnd: (epoch, logs) => {
+          if (epoch % 5 === 4) {
+            log(`  Epoch ${epoch + 1}/15 — loss: ${logs.loss.toFixed(4)}, acc: ${(logs.acc * 100).toFixed(1)}%`);
+          }
+        },
+      },
+    });
+
+    const finalAcc = history.history.acc[history.history.acc.length - 1];
+    const finalLoss = history.history.loss[history.history.loss.length - 1];
+
+    log(`Training complete — final accuracy: ${(finalAcc * 100).toFixed(1)}%, loss: ${finalLoss.toFixed(4)}`, 'success');
+
+    xTensor.dispose();
+    yTensor.dispose();
+
+    return { model, finalAcc, finalLoss, categories: CATEGORIES };
+  } catch (err) {
+    log(`TensorFlow training skipped (${err.message}). Inference engine is unaffected.`, 'warn');
     return null;
   }
-
-  const xTensor = tf.tensor2d(xs, [xs.length, MAX_LEN], 'int32');
-  const yTensor = tf.tensor1d(ys, 'int32');
-
-  log(`Training on ${xs.length} examples for 15 epochs...`);
-
-  const history = await model.fit(xTensor, yTensor, {
-    epochs: 15,
-    batchSize: 8,
-    validationSplit: 0.15,
-    shuffle: true,
-    verbose: 0,
-    callbacks: {
-      onEpochEnd: (epoch, logs) => {
-        if (epoch % 5 === 4) {
-          log(`  Epoch ${epoch + 1}/15 — loss: ${logs.loss.toFixed(4)}, acc: ${(logs.acc * 100).toFixed(1)}%`);
-        }
-      },
-    },
-  });
-
-  const finalAcc = history.history.acc[history.history.acc.length - 1];
-  const finalLoss = history.history.loss[history.history.loss.length - 1];
-
-  log(`Training complete — final accuracy: ${(finalAcc * 100).toFixed(1)}%, loss: ${finalLoss.toFixed(4)}`, 'success');
-
-  xTensor.dispose();
-  yTensor.dispose();
-
-  return { model, finalAcc, finalLoss, categories: CATEGORIES };
 }
 
 function validateResponses(knowledgeBase) {
