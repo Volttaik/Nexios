@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import type { Checkpoint } from '../types/index';
+import { DATA_DIR } from '../utils/paths';
 
-const DATA_DIR = path.join(process.cwd(), 'data', 'nexios-ai');
 const FILE     = path.join(DATA_DIR, 'checkpoints.json');
 const VERSION  = '0.2.0';
 const MAX_CHECKPOINTS = 50;
