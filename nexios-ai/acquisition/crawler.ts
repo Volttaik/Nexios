@@ -108,6 +108,25 @@ export async function crawlBatch(count = 3): Promise<CrawledPage[]> {
   return results;
 }
 
+export async function crawlSpecificUrls(
+  sources: Array<{ url: string; label: string; category: KnowledgeCategory }>,
+  count = 3
+): Promise<CrawledPage[]> {
+  const shuffled = [...sources].sort(() => Math.random() - 0.5).slice(0, count);
+  const results: CrawledPage[] = [];
+
+  for (const src of shuffled) {
+    console.log(`[Crawler] Section-crawl: ${src.label}`);
+    const page = await crawlPage(src.url, src.category);
+    if (page && page.isValid) {
+      results.push(page);
+      console.log(`[Crawler] ✓ ${src.label} (${page.wordCount} words)`);
+    }
+  }
+
+  return results;
+}
+
 export function getKnowledgeSources() {
   return KNOWLEDGE_SOURCES;
 }
