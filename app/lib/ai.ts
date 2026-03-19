@@ -17,9 +17,11 @@ export async function callAI(
   provider: string,
   model: string,
   messages: ChatMessage[],
-  apiKey: string
+  apiKey: string,
+  sessionId?: string
 ): Promise<string> {
   switch (provider) {
+    case 'nexios':    return callNexiosAI(model, messages, sessionId);
     case 'gemini':    return callGemini(model, messages, apiKey);
     case 'groq':      return callGroq(model, messages, apiKey);
     case 'openai':    return callOpenAI(model, messages, apiKey);
@@ -28,6 +30,35 @@ export async function callAI(
     case 'xai':       return callXAI(model, messages, apiKey);
     case 'replit':    return callReplit(model, messages, apiKey);
     default:          return callGemini(model, messages, apiKey);
+  }
+}
+
+async function callNexiosAI(model: string, messages: ChatMessage[], sessionId?: string): Promise<string> {
+  try {
+    const lastMsg = messages[messages.length - 1];
+    const message = lastMsg?.content?.trim();
+    if (!message) return 'Please enter a message.';
+
+    const res = await fetch('/api/nexios-ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, sessionId: sessionId ?? 'default', model }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const meta = model === 'nexios-ultra'
+      ? `\n\n---\n*Nexios AI · Ultra Mode · ${data.knowledgeEntriesUsed} knowledge entries used · ${data.processingMs}ms*`
+      : `\n\n---\n*Nexios AI · ${data.knowledgeEntriesUsed} knowledge entries used · ${data.processingMs}ms*`;
+
+    return (data.content || 'No response.') + meta;
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return `⚠️ **Nexios AI error:** ${msg}\n\nMake sure the Nexios AI system is initialised. Try running training first via the AI panel.`;
   }
 }
 
