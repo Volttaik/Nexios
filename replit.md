@@ -205,6 +205,55 @@ A single clean circular play button (`⏵`) in the CodeWorkspace top bar:
 - White page canvas with zoom
 - Right: AI writing assistant (auto-inserts generated content)
 
+### Nexios AI Autonomous System
+
+A fully autonomous, self-improving AI engine built into the platform under `nexios-ai/`.
+
+#### Lifecycle States (`nexios-ai/lifecycle/manager.ts`)
+- **Idle** → default; no agents active, no responses generated
+- **Starting** → 1.2s warm-up boot sequence
+- **Running** → all agents active, AI responds to prompts
+- **Paused Learning** → agents stopped, AI still responds using existing knowledge
+
+**API:** `POST /api/nexios-ai/lifecycle` with `{ action: "start" | "stop" | "toggleLearning" }`
+
+#### Autonomous Background Agents (`nexios-ai/agents/`)
+| Agent | File | Role | Interval |
+|-------|------|------|----------|
+| **Seeker** | `seeker-agent.ts` | Crawls web + fetches 35 structured datasets | Every 3 min |
+| **Coding** | `coding-agent.ts` | Encodes/deduplicates/stores knowledge to DB | Every 2 min |
+| **Self-Improving** | `self-improving-agent.ts` | Deduplicates, merges, optimises retrieval | Every 8 min |
+| **Orchestrator** | `orchestrator.ts` | Coordinates agents in the continuous loop | 10s poll tick |
+
+#### Dataset Sources (`nexios-ai/datasets/fetcher.ts`)
+35 free dataset sources including:
+- Wikipedia REST API (JavaScript, Python, ML, AI, NLP, algorithms, etc.)
+- MDN Web Docs (JS Guide, CSS Grid, Fetch API, Web APIs)
+- GitHub READMEs (Next.js, React, Tailwind CSS)
+- Wikipedia search queries for frameworks, databases, accessibility
+
+#### Knowledge Base (`nexios-ai/knowledge/storage.ts`)
+- Persistent JSON storage at `data/nexios-ai/knowledge-base.json`
+- Auto-saves with 2s debounce
+- SHA-256 deduplication via Coding Agent
+- Keyword extraction + confidence-weighted scoring for fast retrieval
+
+#### API Routes
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/nexios-ai/lifecycle` | GET/POST | Lifecycle state + controls |
+| `/api/nexios-ai/agents` | GET | Agent status + orchestrator stats |
+| `/api/nexios-ai/knowledge` | GET | KB stats, category counts, search |
+| `/api/nexios-ai/chat` | POST | Chat (only works when AI is Running/Paused) |
+
+#### UI Control Panel (`app/dashboard/nexios-ai/page.tsx`)
+Full control panel accessible via "Nexios AI" in the sidebar:
+- Lifecycle controls: Start, Stop, Pause/Resume Learning buttons
+- Real-time agent panels with expandable logs + cycle counts
+- Knowledge base category breakdown + dataset source list
+- Built-in chat interface (enforces lifecycle state)
+- Continuous learning pipeline visualisation
+
 ### Environment Variables
 
 | Variable | Description | Required |

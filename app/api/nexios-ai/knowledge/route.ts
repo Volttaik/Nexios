@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStorage } from '../../../../nexios-ai/knowledge/storage';
 import { getCheckpoints } from '../../../../nexios-ai/checkpoint/checkpoint';
+import { getDatasetNames, getDatasetCount } from '../../../../nexios-ai/datasets/fetcher';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -19,13 +20,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       total: storage.count(),
       byCategory: storage.countByCategory(),
+      availableDatasets: getDatasetCount(),
+      datasetNames: getDatasetNames(),
     });
   }
 
   if (query.trim()) {
     const results = storage.query({
       text: query,
-      category: cat as any ?? undefined,
+      category: cat as import('../../../../nexios-ai/types/index').KnowledgeCategory ?? undefined,
       limit,
       minConfidence: 0.2,
     });
@@ -45,7 +48,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (cat) {
-    const entries = storage.getByCategory(cat as any, limit);
+    const entries = storage.getByCategory(cat as import('../../../../nexios-ai/types/index').KnowledgeCategory, limit);
     return NextResponse.json({
       category: cat,
       entries: entries.map(e => ({
@@ -62,6 +65,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     total: storage.count(),
     byCategory: storage.countByCategory(),
-    hint: 'Use ?q=search+term or ?category=programming or ?type=checkpoints',
+    availableDatasets: getDatasetCount(),
+    datasetNames: getDatasetNames(),
+    hint: 'Use ?q=search+term or ?category=programming or ?type=checkpoints or ?type=stats',
   });
 }

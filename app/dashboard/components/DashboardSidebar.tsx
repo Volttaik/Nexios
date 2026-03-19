@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { BsRobot, BsGrid, BsChatDots, BsBarChart, BsGear, BsChevronDown, BsChevronRight, BsPlus, BsClock } from 'react-icons/bs';
-import { HiFolder } from 'react-icons/hi';
+import { HiFolder, HiSparkles } from 'react-icons/hi';
 import type { AppUser } from '@/app/types/user';
 
 export interface ChatMessage {
@@ -172,6 +172,9 @@ export default function DashboardSidebar({ isOpen, user, isMobileOpen, onMobileC
 
           {/* Overview */}
           {navLink('/dashboard', 'Overview', BsGrid, true)}
+
+          {/* ── Nexios AI ── */}
+          {navLink('/dashboard/nexios-ai', 'Nexios AI', HiSparkles, true, 'LIVE')}
 
           {/* ── AI Chat section ── */}
           <div className="pt-2">

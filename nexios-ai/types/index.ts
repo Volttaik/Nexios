@@ -128,3 +128,42 @@ export interface SecurityContext {
   requestedBy: string;
   approved: boolean;
 }
+
+/* ─── Lifecycle ─────────────────────────────────────────────────────────── */
+
+export type LifecycleState = 'idle' | 'starting' | 'running' | 'paused';
+
+export interface LifecycleStatus {
+  state: LifecycleState;
+  learningEnabled: boolean;
+  startedAt: number | null;
+  pausedAt: number | null;
+  stateChangedAt: number;
+}
+
+/* ─── Agents ─────────────────────────────────────────────────────────────── */
+
+export type AgentName = 'seeker' | 'coding' | 'self-improving';
+export type AgentState = 'idle' | 'running' | 'completed' | 'error';
+
+export interface AgentStatus {
+  name: AgentName;
+  state: AgentState;
+  cyclesCompleted: number;
+  itemsProcessed: number;
+  lastRunAt: number | null;
+  nextRunAt: number | null;
+  currentTask: string | null;
+  errors: number;
+  log: string[];
+}
+
+export interface OrchestratorStatus {
+  running: boolean;
+  currentAgent: AgentName | null;
+  cycleCount: number;
+  totalItemsProcessed: number;
+  agents: Record<AgentName, AgentStatus>;
+  startedAt: number | null;
+  learningEnabled: boolean;
+}
