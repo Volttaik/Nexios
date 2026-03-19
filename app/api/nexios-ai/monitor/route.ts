@@ -8,8 +8,9 @@ import { getLifecycle } from '../../../../nexios-ai/lifecycle/manager';
 import { getCheckpoints } from '../../../../nexios-ai/checkpoint/checkpoint';
 import fs from 'fs';
 import path from 'path';
+import { DATA_DIR } from '../../../../nexios-ai/utils/paths';
 
-const ERR_LOG = path.join(process.cwd(), 'data', 'nexios-ai', 'errors.log');
+const ERR_LOG = path.join(DATA_DIR, 'errors.log');
 
 function readErrorLog(maxLines = 50): string[] {
   try {
