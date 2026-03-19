@@ -1,6 +1,6 @@
 import type { TaskCategory, KnowledgeResult, ConversationContext } from '../types/index';
 
-const CONFIDENCE_THRESHOLD = 0.22;
+const _CONFIDENCE_THRESHOLD = 0.22;
 
 const SCHEMA_HEADER_RE = /^\[SCHEMA:[^\]]*\](\[SRC:[^\]]*\])?(\[CAT:[^\]]*\])?(\[CONF:[^\]]*\])?(\[TS:[^\]]*\])?\s*/;
 
@@ -134,7 +134,7 @@ function designResponse(input: string, knowledge: KnowledgeResult[]): string {
   return "I don't know this information as of right now — I am still learning. My design knowledge will improve as I learn more from design resources and guidelines.";
 }
 
-function chatResponse(input: string, knowledge: KnowledgeResult[], ctx?: ConversationContext): string {
+function chatResponse(input: string, knowledge: KnowledgeResult[], _ctx?: ConversationContext): string {
   const greeting = greetingResponse(input);
   if (greeting) return greeting;
 

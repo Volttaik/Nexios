@@ -47,7 +47,7 @@ function generateContextualFallback(input: string, category: KnowledgeCategory):
   return `I understand you're asking about "${input.slice(0, 60)}${input.length > 60 ? '...' : ''}". ${FALLBACK_RESPONSES[category]}`;
 }
 
-function selectBestResponse(results: Array<{ entry: { response: string; input: string }; score: number }>, userInput: string): { content: string; confidence: number } {
+function selectBestResponse(results: Array<{ entry: { response: string; input: string }; score: number }>, _userInput: string): { content: string; confidence: number } {
   if (results.length === 0) return { content: '', confidence: 0 };
 
   const top = results[0];

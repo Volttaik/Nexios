@@ -1,4 +1,4 @@
-import type { AgentStatus, KnowledgeEntry } from '../types/index';
+import type { AgentStatus } from '../types/index';
 import { getStorage } from '../knowledge/storage';
 
 const LOG_LIMIT = 100;

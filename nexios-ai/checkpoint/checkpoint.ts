@@ -97,6 +97,7 @@ export function rollbackToCheckpoint(checkpointId: string): { success: boolean; 
     const cp = list.find(c => c.id === checkpointId);
     if (!cp) return { success: false, message: `Checkpoint ${checkpointId} not found` };
 
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getStorage } = require('../knowledge/storage');
     const storage = getStorage();
     const restored = storage.restoreBackup();

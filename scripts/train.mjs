@@ -186,7 +186,7 @@ function validateResponses(knowledgeBase) {
 
     for (const entry of knowledgeBase) {
       const entryTokens = tokenise(entry.input);
-      const score = cosineSimilarity(
+      const _score = cosineSimilarity(
         Array.from({ length: 500 }, (_, i) => inputTokens.includes(String(i)) ? 1 : 0),
         Array.from({ length: 500 }, (_, i) => entryTokens.includes(String(i)) ? 1 : 0)
       );

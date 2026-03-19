@@ -76,7 +76,7 @@ class UltraMode {
       const storage = getStorage();
 
       const items = validPages.map(p => {
-        const { valid, score } = validateContent(p.content, p.url);
+        const { score } = validateContent(p.content, p.url);
         return {
           content: p.content,
           category: p.category,

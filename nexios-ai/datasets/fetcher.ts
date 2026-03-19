@@ -57,7 +57,7 @@ function chunkText(text: string, chunkSize = 1500): string[] {
 
 /* ── Individual dataset fetchers ──────────────────────────────────────── */
 
-async function fetchWikipediaArticle(title: string, category: KnowledgeCategory): Promise<Array<{ content: string; confidence: number }>> {
+async function fetchWikipediaArticle(title: string, _category: KnowledgeCategory): Promise<Array<{ content: string; confidence: number }>> {
   const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
   try {
     const ctrl = new AbortController();
@@ -77,7 +77,7 @@ async function fetchWikipediaArticle(title: string, category: KnowledgeCategory)
   }
 }
 
-async function fetchWikipediaSearch(query: string, category: KnowledgeCategory): Promise<Array<{ content: string; confidence: number }>> {
+async function fetchWikipediaSearch(query: string, _category: KnowledgeCategory): Promise<Array<{ content: string; confidence: number }>> {
   const url = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=5&format=json&origin=*`;
   try {
     const ctrl = new AbortController();

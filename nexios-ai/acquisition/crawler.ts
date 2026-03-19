@@ -74,7 +74,7 @@ export async function crawlPage(url: string, hint?: KnowledgeCategory): Promise<
     const title = extractTitle(html);
     const text = stripHtml(html);
     const words = text.split(/\s+/).filter(Boolean);
-    const { valid, score } = validateContent(text, url);
+    const { valid, score: _score } = validateContent(text, url);
 
     return {
       url,

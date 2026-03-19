@@ -28,7 +28,7 @@ const TECH_KEYWORDS = [
   'mathematics','formula','equation','theorem','proof','definition',
 ];
 
-export function validateContent(text: string, source: string): ValidationResult {
+export function validateContent(text: string, _source: string): ValidationResult {
   const reasons: string[] = [];
   let score = 0.5;
 
